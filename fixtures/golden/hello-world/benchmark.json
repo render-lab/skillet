@@ -1,0 +1,155 @@
+{
+  "metadata": {
+    "skill_name": "hello-world",
+    "skill_path": "fixtures/skills/hello-world",
+    "timestamp": "2025-01-15T10:30:00.000Z",
+    "evals_run": [1, 2, 3],
+    "runs_per_provider": 1,
+    "providers": [
+      { "name": "anthropic", "model": "claude-sonnet-4-20250514" }
+    ],
+    "grader": { "name": "openai", "model": "gpt-4o" }
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 4.2,
+        "input_tokens": 1250,
+        "output_tokens": 380,
+        "total_tokens": 1630,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.0042
+      },
+      "expectations": [
+        {
+          "text": "The agent uses write_file to create hello.txt",
+          "passed": true,
+          "evidence": "The agent called write_file with path 'hello.txt' and content 'Hello, World!'"
+        },
+        {
+          "text": "The file hello.txt contains exactly 'Hello, World!'",
+          "passed": true,
+          "evidence": "File content matches the expected string exactly."
+        },
+        {
+          "text": "The agent reads the file back or otherwise confirms it was created",
+          "passed": true,
+          "evidence": "The agent used read_file on hello.txt and reported the content."
+        }
+      ],
+      "claims": [
+        "Created hello.txt with exact content",
+        "Verified file via read_file"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 6.8,
+        "input_tokens": 1480,
+        "output_tokens": 520,
+        "total_tokens": 2000,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0058
+      },
+      "expectations": [
+        {
+          "text": "The agent creates a file called greet.py",
+          "passed": true,
+          "evidence": "write_file was called with path 'greet.py'."
+        },
+        {
+          "text": "The file contains a print statement that outputs 'Hello from Python!'",
+          "passed": true,
+          "evidence": "File contains: print('Hello from Python!')"
+        },
+        {
+          "text": "The agent runs the script with bash to verify it works",
+          "passed": true,
+          "evidence": "bash tool executed 'python greet.py'."
+        },
+        {
+          "text": "The script output includes 'Hello from Python!'",
+          "passed": true,
+          "evidence": "bash output: Hello from Python!"
+        }
+      ],
+      "claims": [
+        "Created greet.py with correct print statement",
+        "Executed script and confirmed output"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 3,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 5.1,
+        "input_tokens": 1300,
+        "output_tokens": 450,
+        "total_tokens": 1750,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0048
+      },
+      "expectations": [
+        {
+          "text": "The agent uses list_directory or bash ls to list the current directory",
+          "passed": true,
+          "evidence": "bash tool executed 'ls -la' to list directory contents."
+        },
+        {
+          "text": "The agent creates a file called summary.txt",
+          "passed": true,
+          "evidence": "write_file called with path 'summary.txt'."
+        },
+        {
+          "text": "summary.txt contains a directory listing",
+          "passed": true,
+          "evidence": "File contains output of ls showing files in the working directory."
+        }
+      ],
+      "claims": [
+        "Listed directory with bash ls",
+        "Saved listing to summary.txt"
+      ],
+      "eval_feedback": null,
+      "error": null
+    }
+  ],
+  "provider_summary": {
+    "anthropic:claude-sonnet-4-20250514": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0 },
+      "time_seconds": { "mean": 5.37, "stddev": 1.07 },
+      "total_tokens": { "mean": 1793, "stddev": 151.4 },
+      "cost_usd": { "mean": 0.0049, "stddev": 0.0007 }
+    }
+  },
+  "notes": []
+}

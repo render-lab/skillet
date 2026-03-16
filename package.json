@@ -1,0 +1,13 @@
+{
+  "name": "skillet",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "check": "pnpm -r check",
+    "check:fix": "pnpm -r check:fix"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

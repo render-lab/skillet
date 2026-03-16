@@ -1,0 +1,39 @@
+{
+  "skill_name": "hello-world",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a file called hello.txt with the content 'Hello, World!'",
+      "expected_output": "The agent creates hello.txt with the exact content 'Hello, World!' and confirms it was created.",
+      "files": [],
+      "assertions": [
+        "The agent uses write_file to create hello.txt",
+        "The file hello.txt contains exactly 'Hello, World!'",
+        "The agent reads the file back or otherwise confirms it was created"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a Python script called greet.py that prints 'Hello from Python!' when run",
+      "expected_output": "The agent creates greet.py with a print statement and verifies it works by running it.",
+      "files": [],
+      "assertions": [
+        "The agent creates a file called greet.py",
+        "The file contains a print statement that outputs 'Hello from Python!'",
+        "The agent runs the script with bash to verify it works",
+        "The script output includes 'Hello from Python!'"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "List the files in the current directory, then create a summary.txt file that contains the listing",
+      "expected_output": "The agent lists the directory, then writes the listing to summary.txt.",
+      "files": [],
+      "assertions": [
+        "The agent uses list_directory or bash ls to list the current directory",
+        "The agent creates a file called summary.txt",
+        "summary.txt contains a directory listing"
+      ]
+    }
+  ]
+}

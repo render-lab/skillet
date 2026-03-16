@@ -1,0 +1,34 @@
+{
+  "skill_name": "code-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the provided app.py file for bugs, security issues, and code quality problems.",
+      "expected_output": "The agent identifies SQL injection, path traversal, hardcoded secrets, and style issues, and writes a structured review.md.",
+      "files": ["fixtures/app.py"],
+      "assertions": [
+        "The agent identifies the SQL injection vulnerability in get_user",
+        "The agent identifies the path traversal risk in save_file",
+        "The agent flags the hardcoded API key (API_KEY = 'sk-...')",
+        "The agent flags the hardcoded password in authenticate",
+        "The agent writes a review.md file with organized findings",
+        "The review categorizes findings by severity"
+      ]
+    },
+    {
+      "id": 2,
+      "turns": [
+        "Review app.py and tell me the most critical issue you find.",
+        "Good catch. Can you fix that specific issue and write the corrected version to app_fixed.py?"
+      ],
+      "expected_output": "The agent identifies the SQL injection as the most critical issue, then writes a fixed version with parameterized queries.",
+      "files": ["fixtures/app.py"],
+      "assertions": [
+        "The agent identifies SQL injection as a critical security issue",
+        "The agent explains why string formatting in SQL queries is dangerous",
+        "After the follow-up, the agent creates app_fixed.py",
+        "app_fixed.py uses parameterized queries instead of string formatting"
+      ]
+    }
+  ]
+}

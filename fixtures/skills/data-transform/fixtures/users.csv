@@ -1,0 +1,11 @@
+name,email,age,role,active
+Alice Johnson,alice@example.com,32,admin,true
+Bob Smith,bob@example.com,28,user,true
+Carol White,,45,admin,false
+Dave Brown,dave@example.com,,user,true
+Eve Davis,eve@example.com,31,moderator,true
+Frank Miller,frank@example.com,29,user,false
+Grace Lee,grace@example.com,38,admin,true
+,henry@example.com,42,user,true
+Ivy Chen,ivy@example.com,26,user,true
+Jack Wilson,jack@example.com,35,,true

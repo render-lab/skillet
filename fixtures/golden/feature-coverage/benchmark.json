@@ -1,0 +1,320 @@
+{
+  "metadata": {
+    "skill_name": "feature-coverage",
+    "skill_path": "fixtures/skills/feature-coverage",
+    "timestamp": "2025-01-15T12:30:00.000Z",
+    "evals_run": [1, 2, 3, 4, 5],
+    "runs_per_provider": 1,
+    "providers": [
+      { "name": "anthropic", "model": "claude-sonnet-4-20250514" },
+      { "name": "openai", "model": "gpt-4o" }
+    ],
+    "grader": { "name": "openai", "model": "gpt-4o" }
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 5.1,
+        "input_tokens": 1600,
+        "output_tokens": 400,
+        "total_tokens": 2000,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.0048
+      },
+      "expectations": [
+        { "text": "The agent reads input.txt using read_file or bash", "passed": true, "evidence": "read_file called on input.txt." },
+        { "text": "The agent determines there are 4 lines", "passed": true, "evidence": "Agent reported 4 lines." },
+        { "text": "The agent creates line_count.txt containing the number 4", "passed": true, "evidence": "write_file created line_count.txt with content '4'." }
+      ],
+      "claims": ["Counted 4 lines", "Wrote result to line_count.txt"],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 1,
+      "provider": "openai",
+      "model": "gpt-4o",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 6.3,
+        "input_tokens": 1700,
+        "output_tokens": 380,
+        "total_tokens": 2080,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0052
+      },
+      "expectations": [
+        { "text": "The agent reads input.txt using read_file or bash", "passed": true, "evidence": "Used bash wc -l on input.txt." },
+        { "text": "The agent determines there are 4 lines", "passed": true, "evidence": "Reported 4 lines." },
+        { "text": "The agent creates line_count.txt containing the number 4", "passed": true, "evidence": "write_file created line_count.txt." }
+      ],
+      "claims": ["Used wc -l for counting", "Result is correct"],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 7.2,
+        "input_tokens": 1900,
+        "output_tokens": 500,
+        "total_tokens": 2400,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0065
+      },
+      "expectations": [
+        { "text": "The agent reads data.json", "passed": true, "evidence": "read_file called on data.json." },
+        { "text": "The agent correctly computes the sum as 150", "passed": true, "evidence": "Computed 10+20+30+40+50=150." },
+        { "text": "The agent creates sum.txt containing 150", "passed": true, "evidence": "write_file created sum.txt with '150'." }
+      ],
+      "claims": ["Summed values correctly"],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "openai",
+      "model": "gpt-4o",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 8.8,
+        "input_tokens": 2100,
+        "output_tokens": 520,
+        "total_tokens": 2620,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0071
+      },
+      "expectations": [
+        { "text": "The agent reads data.json", "passed": true, "evidence": "read_file called on data.json." },
+        { "text": "The agent correctly computes the sum as 150", "passed": true, "evidence": "Sum computed as 150." },
+        { "text": "The agent creates sum.txt containing 150", "passed": true, "evidence": "Created sum.txt." }
+      ],
+      "claims": ["Read JSON and computed sum"],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 3,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 6.5,
+        "input_tokens": 1400,
+        "output_tokens": 350,
+        "total_tokens": 1750,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0044
+      },
+      "expectations": [
+        { "text": "The agent uses bash to run a python version command", "passed": true, "evidence": "bash: python3 --version" },
+        { "text": "The agent uses bash to get the current date", "passed": true, "evidence": "bash: date" },
+        { "text": "The agent creates env_info.txt with both pieces of information", "passed": true, "evidence": "write_file created env_info.txt with Python version and date." }
+      ],
+      "claims": ["Gathered env info via bash", "Saved to file"],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 3,
+      "provider": "openai",
+      "model": "gpt-4o",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 7.9,
+        "input_tokens": 1500,
+        "output_tokens": 400,
+        "total_tokens": 1900,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0050
+      },
+      "expectations": [
+        { "text": "The agent uses bash to run a python version command", "passed": true, "evidence": "Ran python3 --version." },
+        { "text": "The agent uses bash to get the current date", "passed": true, "evidence": "Ran date command." },
+        { "text": "The agent creates env_info.txt with both pieces of information", "passed": true, "evidence": "Created env_info.txt." }
+      ],
+      "claims": ["Collected Python version and date"],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 4,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 24.5,
+        "input_tokens": 5200,
+        "output_tokens": 2200,
+        "total_tokens": 7400,
+        "tool_calls": 7,
+        "errors": 0,
+        "cost_usd": 0.0265
+      },
+      "expectations": [
+        { "text": "The agent correctly identifies gamma, delta, and epsilon as items with value > 25", "passed": true, "evidence": "Listed gamma (30), delta (40), epsilon (50)." },
+        { "text": "After turn 2, the agent writes an updated data.json with the new zeta item", "passed": true, "evidence": "write_file updated data.json with 6 items." },
+        { "text": "The new item has id 6, name 'zeta', and value 60", "passed": true, "evidence": "New entry: {id: 6, name: 'zeta', value: 60}." },
+        { "text": "After turn 3, the agent confirms the updated file contains 6 items including zeta", "passed": true, "evidence": "read_file confirmed 6 items, last being zeta." }
+      ],
+      "claims": [
+        "Filtered items correctly",
+        "Added zeta item",
+        "Verified persistence across turns"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 4,
+      "provider": "openai",
+      "model": "gpt-4o",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.75,
+        "passed": 3,
+        "failed": 1,
+        "total": 4,
+        "time_seconds": 28.1,
+        "input_tokens": 5500,
+        "output_tokens": 2000,
+        "total_tokens": 7500,
+        "tool_calls": 6,
+        "errors": 0,
+        "cost_usd": 0.0280
+      },
+      "expectations": [
+        { "text": "The agent correctly identifies gamma, delta, and epsilon as items with value > 25", "passed": true, "evidence": "Correct items listed." },
+        { "text": "After turn 2, the agent writes an updated data.json with the new zeta item", "passed": true, "evidence": "Updated data.json." },
+        { "text": "The new item has id 6, name 'zeta', and value 60", "passed": true, "evidence": "Correct values for zeta." },
+        { "text": "After turn 3, the agent confirms the updated file contains 6 items including zeta", "passed": false, "evidence": "Agent stated the file was updated but did not read it back to confirm." }
+      ],
+      "claims": [
+        "Filtered and added correctly",
+        "Did not verify with read_file"
+      ],
+      "eval_feedback": "Agent skipped verification in turn 3 -- did not read the file back.",
+      "error": null
+    },
+    {
+      "eval_id": 5,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 11.3,
+        "input_tokens": 2800,
+        "output_tokens": 1100,
+        "total_tokens": 3900,
+        "tool_calls": 4,
+        "errors": 0,
+        "cost_usd": 0.0118
+      },
+      "expectations": [
+        { "text": "The agent reads both input.txt and data.json", "passed": true, "evidence": "Both files read via read_file." },
+        { "text": "combined.md starts with '# Report'", "passed": true, "evidence": "First line of combined.md is '# Report'." },
+        { "text": "The file includes the text content of input.txt in a code block", "passed": true, "evidence": "Content wrapped in triple-backtick code fence." },
+        { "text": "The file includes a markdown table with item names and values", "passed": true, "evidence": "Pipe-delimited table with Name | Value header." },
+        { "text": "All 5 items from data.json appear in the table", "passed": true, "evidence": "alpha, beta, gamma, delta, epsilon all present." }
+      ],
+      "claims": [
+        "Combined both files into markdown",
+        "Proper code block and table formatting"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 5,
+      "provider": "openai",
+      "model": "gpt-4o",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 13.7,
+        "input_tokens": 3000,
+        "output_tokens": 1200,
+        "total_tokens": 4200,
+        "tool_calls": 4,
+        "errors": 0,
+        "cost_usd": 0.0130
+      },
+      "expectations": [
+        { "text": "The agent reads both input.txt and data.json", "passed": true, "evidence": "Both files read." },
+        { "text": "combined.md starts with '# Report'", "passed": true, "evidence": "Heading present." },
+        { "text": "The file includes the text content of input.txt in a code block", "passed": true, "evidence": "Code block with input text." },
+        { "text": "The file includes a markdown table with item names and values", "passed": true, "evidence": "Table with headers and rows." },
+        { "text": "All 5 items from data.json appear in the table", "passed": true, "evidence": "All items present." }
+      ],
+      "claims": [
+        "Read and combined both files",
+        "Markdown formatting correct"
+      ],
+      "eval_feedback": null,
+      "error": null
+    }
+  ],
+  "provider_summary": {
+    "anthropic:claude-sonnet-4-20250514": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0 },
+      "time_seconds": { "mean": 10.92, "stddev": 7.12 },
+      "total_tokens": { "mean": 3490, "stddev": 1960.0 },
+      "cost_usd": { "mean": 0.0108, "stddev": 0.0082 }
+    },
+    "openai:gpt-4o": {
+      "pass_rate": { "mean": 0.95, "stddev": 0.10 },
+      "time_seconds": { "mean": 12.96, "stddev": 8.07 },
+      "total_tokens": { "mean": 3660, "stddev": 2062.0 },
+      "cost_usd": { "mean": 0.0117, "stddev": 0.0086 }
+    }
+  },
+  "notes": []
+}

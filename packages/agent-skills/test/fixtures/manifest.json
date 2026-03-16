@@ -1,0 +1,12 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "skills": {
+    "test-org/test-repo/sample-skill": "^1.0.0",
+    "test-org/test-repo/other-skill": "latest"
+  },
+  "config": {
+    "target": ["cursor", "claude-code"],
+    "inject": "eager"
+  }
+}

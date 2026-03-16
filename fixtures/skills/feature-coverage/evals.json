@@ -1,0 +1,68 @@
+{
+  "skill_name": "feature-coverage",
+  "models": ["anthropic:claude-sonnet-4-20250514", "openai:gpt-4o"],
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Count the number of lines in input.txt and write the result to line_count.txt.",
+      "expected_output": "The agent reads input.txt, counts 4 lines, and writes '4' to line_count.txt.",
+      "files": ["fixtures/input.txt"],
+      "assertions": [
+        "The agent reads input.txt using read_file or bash",
+        "The agent determines there are 4 lines",
+        "The agent creates line_count.txt containing the number 4"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Read data.json and compute the sum of all 'value' fields. Write a file called sum.txt with just the number.",
+      "expected_output": "The agent reads the JSON, sums the values (10+20+30+40+50=150), and writes 150 to sum.txt.",
+      "files": ["fixtures/data.json"],
+      "assertions": [
+        "The agent reads data.json",
+        "The agent correctly computes the sum as 150",
+        "The agent creates sum.txt containing 150"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Use bash to check the current Python version and the current date, then write both to a file called env_info.txt.",
+      "expected_output": "The agent runs bash commands for python version and date, then saves the output.",
+      "files": [],
+      "assertions": [
+        "The agent uses bash to run a python version command",
+        "The agent uses bash to get the current date",
+        "The agent creates env_info.txt with both pieces of information"
+      ]
+    },
+    {
+      "id": 4,
+      "turns": [
+        "Read data.json and list the names of all items with value greater than 25.",
+        "Now add a new item with id 6, name 'zeta', value 60 to data.json and save it.",
+        "Read data.json back and confirm the new item is there."
+      ],
+      "expected_output": "The agent filters items, then modifies the JSON by adding a new entry, then verifies the change persists.",
+      "files": ["fixtures/data.json"],
+      "assertions": [
+        "The agent correctly identifies gamma, delta, and epsilon as items with value > 25",
+        "After turn 2, the agent writes an updated data.json with the new zeta item",
+        "The new item has id 6, name 'zeta', and value 60",
+        "After turn 3, the agent confirms the updated file contains 6 items including zeta"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Read both input.txt and data.json. Create a file called combined.md that has a markdown heading '# Report', followed by the contents of input.txt in a code block, then a table listing each item name and value from data.json.",
+      "expected_output": "The agent reads both files and produces a well-formatted markdown document combining their content.",
+      "files": ["fixtures/input.txt", "fixtures/data.json"],
+      "assertions": [
+        "The agent reads both input.txt and data.json",
+        "combined.md starts with '# Report'",
+        "The file includes the text content of input.txt in a code block",
+        "The file includes a markdown table with item names and values",
+        "All 5 items from data.json appear in the table"
+      ]
+    }
+  ]
+}

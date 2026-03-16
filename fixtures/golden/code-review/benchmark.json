@@ -1,0 +1,159 @@
+{
+  "metadata": {
+    "skill_name": "code-review",
+    "skill_path": "fixtures/skills/code-review",
+    "timestamp": "2025-01-15T11:00:00.000Z",
+    "evals_run": [1, 2],
+    "runs_per_provider": 1,
+    "providers": [
+      { "name": "anthropic", "model": "claude-sonnet-4-20250514" },
+      { "name": "openai", "model": "gpt-4o" }
+    ],
+    "grader": { "name": "openai", "model": "gpt-4o" }
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 12.4,
+        "input_tokens": 2800,
+        "output_tokens": 1200,
+        "total_tokens": 4000,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0125
+      },
+      "expectations": [
+        { "text": "The agent identifies the SQL injection vulnerability in get_user", "passed": true, "evidence": "Review mentions SQL injection via f-string formatting in get_user." },
+        { "text": "The agent identifies the path traversal risk in save_file", "passed": true, "evidence": "Review flags unsanitized filename concatenation in save_file." },
+        { "text": "The agent flags the hardcoded API key (API_KEY = 'sk-...')", "passed": true, "evidence": "Review lists hardcoded API_KEY as a critical secret exposure." },
+        { "text": "The agent flags the hardcoded password in authenticate", "passed": true, "evidence": "Review identifies hardcoded password comparison." },
+        { "text": "The agent writes a review.md file with organized findings", "passed": true, "evidence": "write_file called with path 'review.md'." },
+        { "text": "The review categorizes findings by severity", "passed": true, "evidence": "review.md contains Critical, Warning, and Suggestion sections." }
+      ],
+      "claims": [
+        "Found 4 security issues",
+        "Wrote structured review.md"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 1,
+      "provider": "openai",
+      "model": "gpt-4o",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.833,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 15.2,
+        "input_tokens": 3100,
+        "output_tokens": 1050,
+        "total_tokens": 4150,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.0148
+      },
+      "expectations": [
+        { "text": "The agent identifies the SQL injection vulnerability in get_user", "passed": true, "evidence": "Review correctly identifies SQL injection." },
+        { "text": "The agent identifies the path traversal risk in save_file", "passed": true, "evidence": "Review mentions path traversal." },
+        { "text": "The agent flags the hardcoded API key (API_KEY = 'sk-...')", "passed": true, "evidence": "Review flags the hardcoded secret." },
+        { "text": "The agent flags the hardcoded password in authenticate", "passed": true, "evidence": "Review mentions hardcoded password." },
+        { "text": "The agent writes a review.md file with organized findings", "passed": true, "evidence": "write_file created review.md." },
+        { "text": "The review categorizes findings by severity", "passed": false, "evidence": "Findings are listed but not categorized by severity level." }
+      ],
+      "claims": [
+        "Identified all security issues",
+        "Created review but without severity categories"
+      ],
+      "eval_feedback": "The review identified all issues but did not organize them by severity as required.",
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 18.6,
+        "input_tokens": 4200,
+        "output_tokens": 1800,
+        "total_tokens": 6000,
+        "tool_calls": 4,
+        "errors": 0,
+        "cost_usd": 0.0195
+      },
+      "expectations": [
+        { "text": "The agent identifies SQL injection as a critical security issue", "passed": true, "evidence": "Agent explicitly called SQL injection the most critical issue." },
+        { "text": "The agent explains why string formatting in SQL queries is dangerous", "passed": true, "evidence": "Explanation covers arbitrary SQL execution via user-controlled input." },
+        { "text": "After the follow-up, the agent creates app_fixed.py", "passed": true, "evidence": "write_file called with path 'app_fixed.py'." },
+        { "text": "app_fixed.py uses parameterized queries instead of string formatting", "passed": true, "evidence": "Fixed code uses cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))." }
+      ],
+      "claims": [
+        "Identified SQL injection as top priority",
+        "Wrote corrected version with parameterized queries"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "openai",
+      "model": "gpt-4o",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 20.1,
+        "input_tokens": 4500,
+        "output_tokens": 1600,
+        "total_tokens": 6100,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0210
+      },
+      "expectations": [
+        { "text": "The agent identifies SQL injection as a critical security issue", "passed": true, "evidence": "Agent flagged SQL injection as the most severe vulnerability." },
+        { "text": "The agent explains why string formatting in SQL queries is dangerous", "passed": true, "evidence": "Detailed explanation of injection attacks via user input." },
+        { "text": "After the follow-up, the agent creates app_fixed.py", "passed": true, "evidence": "Created app_fixed.py via write_file." },
+        { "text": "app_fixed.py uses parameterized queries instead of string formatting", "passed": true, "evidence": "Uses ? placeholders with tuple parameters." }
+      ],
+      "claims": [
+        "SQL injection identified as critical",
+        "Parameterized queries applied in fix"
+      ],
+      "eval_feedback": null,
+      "error": null
+    }
+  ],
+  "provider_summary": {
+    "anthropic:claude-sonnet-4-20250514": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0 },
+      "time_seconds": { "mean": 15.5, "stddev": 3.1 },
+      "total_tokens": { "mean": 5000, "stddev": 1000.0 },
+      "cost_usd": { "mean": 0.0160, "stddev": 0.0035 }
+    },
+    "openai:gpt-4o": {
+      "pass_rate": { "mean": 0.917, "stddev": 0.083 },
+      "time_seconds": { "mean": 17.65, "stddev": 2.45 },
+      "total_tokens": { "mean": 5125, "stddev": 975.0 },
+      "cost_usd": { "mean": 0.0179, "stddev": 0.0031 }
+    }
+  },
+  "notes": []
+}

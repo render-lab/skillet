@@ -1,0 +1,48 @@
+{
+  "skill_name": "data-transform",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Read users.csv and convert it to a JSON file called users.json. Each row should become an object. Handle missing values by using null.",
+      "expected_output": "The agent reads the CSV, converts it to a JSON array of objects, handles missing values as null, and writes users.json.",
+      "files": ["fixtures/users.csv"],
+      "assertions": [
+        "The agent reads users.csv successfully",
+        "The agent creates a valid JSON file called users.json",
+        "Each CSV row is represented as a JSON object",
+        "Missing values (empty cells) are represented as null",
+        "The JSON file contains 10 entries matching the 10 data rows"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Using the config.json filter settings, read users.csv and produce a filtered output file called filtered_users.json. The config specifies: only active users, only admin and moderator roles, output fields are name/email/role, sorted by name.",
+      "expected_output": "The agent reads both files, applies the filters, and produces a correctly filtered and sorted JSON output.",
+      "files": ["fixtures/users.csv", "fixtures/config.json"],
+      "assertions": [
+        "The agent reads both users.csv and config.json",
+        "The output only includes users where active is true",
+        "The output only includes users with role admin or moderator",
+        "Each output entry contains only name, email, and role fields",
+        "The output is sorted alphabetically by name",
+        "The agent creates filtered_users.json with the correct entries"
+      ]
+    },
+    {
+      "id": 3,
+      "turns": [
+        "Read users.csv and give me a summary: how many users total, how many per role, and the average age.",
+        "Now write a markdown report called report.md with those stats, formatted as a nice table."
+      ],
+      "expected_output": "The agent analyzes the CSV, reports summary statistics, then formats them into a markdown report.",
+      "files": ["fixtures/users.csv"],
+      "assertions": [
+        "The agent correctly reports the total number of users (10)",
+        "The agent provides a count per role (admin, user, moderator)",
+        "The agent calculates the average age, handling missing values",
+        "After the follow-up, the agent creates report.md",
+        "report.md contains a markdown table with the statistics"
+      ]
+    }
+  ]
+}

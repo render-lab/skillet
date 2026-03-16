@@ -1,0 +1,121 @@
+{
+  "metadata": {
+    "skill_name": "data-transform",
+    "skill_path": "fixtures/skills/data-transform",
+    "timestamp": "2025-01-15T12:00:00.000Z",
+    "evals_run": [1, 2, 3],
+    "runs_per_provider": 1,
+    "providers": [
+      { "name": "anthropic", "model": "claude-sonnet-4-20250514" }
+    ],
+    "grader": { "name": "openai", "model": "gpt-4o" }
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 8.5,
+        "input_tokens": 2200,
+        "output_tokens": 900,
+        "total_tokens": 3100,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.0095
+      },
+      "expectations": [
+        { "text": "The agent reads users.csv successfully", "passed": true, "evidence": "read_file called on users.csv." },
+        { "text": "The agent creates a valid JSON file called users.json", "passed": true, "evidence": "write_file created users.json with valid JSON array." },
+        { "text": "Each CSV row is represented as a JSON object", "passed": true, "evidence": "JSON contains 10 objects with name/email/age/role/active keys." },
+        { "text": "Missing values (empty cells) are represented as null", "passed": true, "evidence": "Carol's email is null, Dave's age is null, Henry's name is null." },
+        { "text": "The JSON file contains 10 entries matching the 10 data rows", "passed": true, "evidence": "Array length is 10." }
+      ],
+      "claims": [
+        "Converted CSV to JSON with null for missing values"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 14.2,
+        "input_tokens": 3400,
+        "output_tokens": 1300,
+        "total_tokens": 4700,
+        "tool_calls": 4,
+        "errors": 0,
+        "cost_usd": 0.0152
+      },
+      "expectations": [
+        { "text": "The agent reads both users.csv and config.json", "passed": true, "evidence": "Both files read via read_file." },
+        { "text": "The output only includes users where active is true", "passed": true, "evidence": "Carol (active=false) and Frank (active=false) excluded." },
+        { "text": "The output only includes users with role admin or moderator", "passed": true, "evidence": "Only Alice (admin), Eve (moderator), and Grace (admin) appear." },
+        { "text": "Each output entry contains only name, email, and role fields", "passed": true, "evidence": "Objects contain exactly name, email, role keys." },
+        { "text": "The output is sorted alphabetically by name", "passed": true, "evidence": "Order: Alice, Eve, Grace." },
+        { "text": "The agent creates filtered_users.json with the correct entries", "passed": true, "evidence": "write_file created filtered_users.json with 3 entries." }
+      ],
+      "claims": [
+        "Applied active and role filters correctly",
+        "Selected correct output fields",
+        "Sorted by name"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 3,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 16.8,
+        "input_tokens": 3900,
+        "output_tokens": 1500,
+        "total_tokens": 5400,
+        "tool_calls": 4,
+        "errors": 0,
+        "cost_usd": 0.0172
+      },
+      "expectations": [
+        { "text": "The agent correctly reports the total number of users (10)", "passed": true, "evidence": "Reported 10 total users." },
+        { "text": "The agent provides a count per role (admin, user, moderator)", "passed": true, "evidence": "admin: 3, user: 5, moderator: 1, missing: 1." },
+        { "text": "The agent calculates the average age, handling missing values", "passed": true, "evidence": "Average computed over 8 non-null ages: 33.25." },
+        { "text": "After the follow-up, the agent creates report.md", "passed": true, "evidence": "write_file created report.md." },
+        { "text": "report.md contains a markdown table with the statistics", "passed": true, "evidence": "File contains a pipe-delimited markdown table with headers." }
+      ],
+      "claims": [
+        "Computed stats with null handling",
+        "Generated markdown report with table"
+      ],
+      "eval_feedback": null,
+      "error": null
+    }
+  ],
+  "provider_summary": {
+    "anthropic:claude-sonnet-4-20250514": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0 },
+      "time_seconds": { "mean": 13.17, "stddev": 3.42 },
+      "total_tokens": { "mean": 4400, "stddev": 943.4 },
+      "cost_usd": { "mean": 0.0140, "stddev": 0.0032 }
+    }
+  },
+  "notes": []
+}

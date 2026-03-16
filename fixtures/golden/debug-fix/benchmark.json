@@ -1,0 +1,91 @@
+{
+  "metadata": {
+    "skill_name": "debug-fix",
+    "skill_path": "fixtures/skills/debug-fix",
+    "timestamp": "2025-01-15T11:30:00.000Z",
+    "evals_run": [1, 2],
+    "runs_per_provider": 1,
+    "providers": [
+      { "name": "anthropic", "model": "claude-sonnet-4-20250514" }
+    ],
+    "grader": { "name": "openai", "model": "gpt-4o" }
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 22.3,
+        "input_tokens": 3800,
+        "output_tokens": 2100,
+        "total_tokens": 5900,
+        "tool_calls": 6,
+        "errors": 0,
+        "cost_usd": 0.0210
+      },
+      "expectations": [
+        { "text": "The agent runs stats_broken.py with bash to observe the broken output", "passed": true, "evidence": "Executed: python stats_broken.py '10,20,30,40,50'" },
+        { "text": "The agent identifies the integer division bug in the mean function", "passed": true, "evidence": "Noted // should be / for float division." },
+        { "text": "The agent identifies the off-by-one error in the median function", "passed": true, "evidence": "Identified mid+1 should be mid-1 for even-length lists." },
+        { "text": "The agent identifies the operator precedence bug in the stddev function", "passed": true, "evidence": "Noted (x - avg) ** 2 needs parentheses around x - avg." },
+        { "text": "The agent creates stats_fixed.py with all bugs corrected", "passed": true, "evidence": "write_file created stats_fixed.py with all three fixes applied." },
+        { "text": "The agent runs stats_fixed.py to verify correctness", "passed": true, "evidence": "Ran stats_fixed.py and confirmed mean=30.0, median=30.0." }
+      ],
+      "claims": [
+        "Found all 3 bugs via execution",
+        "Created working stats_fixed.py",
+        "Verified output matches reference"
+      ],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 19.7,
+        "input_tokens": 4100,
+        "output_tokens": 1900,
+        "total_tokens": 6000,
+        "tool_calls": 5,
+        "errors": 0,
+        "cost_usd": 0.0198
+      },
+      "expectations": [
+        { "text": "The agent runs the script and reports the incorrect mean value", "passed": true, "evidence": "Reported mean as 2 instead of 3.0." },
+        { "text": "The agent explains the integer division issue in mean", "passed": true, "evidence": "Explained // truncates to integer." },
+        { "text": "The agent explains the off-by-one in median", "passed": true, "evidence": "Explained mid+1 index out of range for even lists." },
+        { "text": "After the follow-up, the agent fixes only mean and median", "passed": true, "evidence": "Only mean and median functions were modified in the output." },
+        { "text": "The stddev bug is intentionally left unfixed per the instruction", "passed": true, "evidence": "stddev function remains unchanged with the operator precedence bug." }
+      ],
+      "claims": [
+        "Correctly diagnosed mean and median bugs",
+        "Applied partial fix as instructed",
+        "Left stddev untouched"
+      ],
+      "eval_feedback": null,
+      "error": null
+    }
+  ],
+  "provider_summary": {
+    "anthropic:claude-sonnet-4-20250514": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0 },
+      "time_seconds": { "mean": 21.0, "stddev": 1.3 },
+      "total_tokens": { "mean": 5950, "stddev": 50.0 },
+      "cost_usd": { "mean": 0.0204, "stddev": 0.0006 }
+    }
+  },
+  "notes": []
+}

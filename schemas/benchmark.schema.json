@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BenchmarkFile",
+  "description": "Schema for benchmark.json output files",
+  "type": "object",
+  "required": ["metadata", "runs", "provider_summary"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["skill_name", "skill_path", "timestamp", "evals_run", "runs_per_provider", "providers", "grader"],
+      "properties": {
+        "skill_name": { "type": "string" },
+        "skill_path": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "evals_run": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "runs_per_provider": { "type": "integer" },
+        "providers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ProviderInfo" }
+        },
+        "grader": { "$ref": "#/$defs/ProviderInfo" }
+      },
+      "additionalProperties": false
+    },
+    "runs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/BenchmarkRun" }
+    },
+    "provider_summary": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["pass_rate", "time_seconds", "total_tokens", "cost_usd"],
+        "properties": {
+          "pass_rate": { "$ref": "#/$defs/Stats" },
+          "time_seconds": { "$ref": "#/$defs/Stats" },
+          "total_tokens": { "$ref": "#/$defs/Stats" },
+          "cost_usd": { "$ref": "#/$defs/Stats" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "ProviderInfo": {
+      "type": "object",
+      "required": ["name", "model"],
+      "properties": {
+        "name": { "type": "string" },
+        "model": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "Stats": {
+      "type": "object",
+      "required": ["mean", "stddev"],
+      "properties": {
+        "mean": { "type": "number" },
+        "stddev": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "RunResult": {
+      "type": "object",
+      "required": ["pass_rate", "passed", "failed", "total", "time_seconds", "input_tokens", "output_tokens", "total_tokens", "tool_calls", "errors", "cost_usd"],
+      "properties": {
+        "pass_rate": { "type": "number" },
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "total": { "type": "integer" },
+        "time_seconds": { "type": "number" },
+        "input_tokens": { "type": "integer" },
+        "output_tokens": { "type": "integer" },
+        "total_tokens": { "type": "integer" },
+        "tool_calls": { "type": "integer" },
+        "errors": { "type": "integer" },
+        "cost_usd": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "BenchmarkRun": {
+      "type": "object",
+      "required": ["eval_id", "provider", "model", "run_number", "result", "expectations"],
+      "properties": {
+        "eval_id": { "type": "integer" },
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "run_number": { "type": "integer" },
+        "result": { "$ref": "#/$defs/RunResult" },
+        "expectations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["text", "passed", "evidence"],
+            "properties": {
+              "text": { "type": "string" },
+              "passed": { "type": "boolean" },
+              "evidence": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "claims": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "eval_feedback": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "error": {
+          "type": ["string", "null"],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

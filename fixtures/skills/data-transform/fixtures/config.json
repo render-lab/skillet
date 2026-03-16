@@ -1,0 +1,11 @@
+{
+  "filters": {
+    "active_only": true,
+    "roles": ["admin", "moderator"]
+  },
+  "output": {
+    "format": "json",
+    "fields": ["name", "email", "role"],
+    "sort_by": "name"
+  }
+}

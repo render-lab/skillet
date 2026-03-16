@@ -1,0 +1,35 @@
+{
+  "skill_name": "debug-fix",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "The file stats_broken.py is supposed to compute basic statistics (mean, median, stddev) for a list of numbers. It has several bugs. Run it with the input '10,20,30,40,50' to see the issues, then fix all the bugs and save the result as stats_fixed.py. Verify the fixed version produces correct output.",
+      "expected_output": "The agent runs the broken script, identifies the bugs (integer division in mean, off-by-one in median, operator precedence in stddev, missing strip in parse_input), fixes them, and verifies the output.",
+      "files": ["fixtures/stats_broken.py", "fixtures/stats.py"],
+      "assertions": [
+        "The agent runs stats_broken.py with bash to observe the broken output",
+        "The agent identifies the integer division bug in the mean function",
+        "The agent identifies the off-by-one error in the median function",
+        "The agent identifies the operator precedence bug in the stddev function",
+        "The agent creates stats_fixed.py with all bugs corrected",
+        "The agent runs stats_fixed.py to verify correctness"
+      ]
+    },
+    {
+      "id": 2,
+      "turns": [
+        "Run stats_broken.py with the input '1,2,3,4,5' and tell me what's wrong with the output.",
+        "Now fix only the mean and median functions. Leave everything else as-is."
+      ],
+      "expected_output": "The agent runs the script, explains the incorrect mean and median, then produces a partially-fixed version with only those two functions corrected.",
+      "files": ["fixtures/stats_broken.py"],
+      "assertions": [
+        "The agent runs the script and reports the incorrect mean value",
+        "The agent explains the integer division issue in mean",
+        "The agent explains the off-by-one in median",
+        "After the follow-up, the agent fixes only mean and median",
+        "The stddev bug is intentionally left unfixed per the instruction"
+      ]
+    }
+  ]
+}
