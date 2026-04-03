@@ -53,7 +53,7 @@ Guidelines:
 - Assertions should be specific and objectively verifiable (not vague)
 - Include 3-6 assertions per eval
 - expected_output describes the ideal behavior, assertions are the checkable claims
-- The "files" array is for input files the eval needs (usually empty)
+- Use the "files" array to reference input files the eval needs (e.g. "fixtures/app.py", "fixtures/data.csv"). Use "fixtures/" as the subdirectory. Leave "files" empty only when the agent creates everything from scratch.
 - Use "turns" when the skill involves clarification, follow-up questions, ambiguous requests that need disambiguation, iterative refinement, or any back-and-forth. If the skill would reasonably involve the agent asking the user something before proceeding, model that as a multi-turn eval.
 - When using "turns", the first message is intentionally vague or incomplete so the agent must ask a clarifying question. The second message is the user's reply. You can use 2-4 turns.
 - When using "turns", assertions can reference behavior across turns (e.g., "After the user provides X, the agent does Y")

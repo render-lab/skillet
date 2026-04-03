@@ -2,10 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
 import { PROVIDER_REGISTRY, loadConfig, resolveSkillPaths } from "../config.js";
+import { compareBenchmarks, printComparison } from "./compare.js";
 import { printResults } from "../report/console-reporter.js";
 import { writeDashboard } from "../report/html-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
 import { runOrchestrator } from "../runner/orchestrator.js";
+import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { type EvalCase, EvalsFileSchema, getTurns } from "../schemas/evals.js";
 import { VERSION } from "../version.js";
 
@@ -20,6 +22,7 @@ export interface RunOpts {
 	runs?: string;
 	timeout?: string;
 	concurrency?: string;
+	golden?: string;
 }
 
 export function buildSystemPrompt(skillContent: string): string {
@@ -80,6 +83,14 @@ export async function runRun(opts: RunOpts) {
 
 	printResults(result, evals, config.providers.length);
 	writeOutputs(result, config, evalsFile, evals, opts, paths);
+
+	if (opts.golden) {
+		const goldenRaw = JSON.parse(fs.readFileSync(opts.golden, "utf-8"));
+		const golden = BenchmarkFileSchema.parse(goldenRaw);
+		const results = compareBenchmarks(golden.provider_summary, result.providerSummary);
+		const failed = printComparison(results, opts.golden);
+		if (failed) process.exit(1);
+	}
 }
 
 function printRunHeader(

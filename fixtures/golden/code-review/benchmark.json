@@ -2,157 +2,381 @@
   "metadata": {
     "skill_name": "code-review",
     "skill_path": "fixtures/skills/code-review",
-    "timestamp": "2025-01-15T11:00:00.000Z",
-    "evals_run": [1, 2],
+    "timestamp": "2026-03-16T05:19:34.691Z",
+    "evals_run": [
+      1,
+      2
+    ],
     "runs_per_provider": 1,
     "providers": [
-      { "name": "anthropic", "model": "claude-sonnet-4-20250514" },
-      { "name": "openai", "model": "gpt-4o" }
+      {
+        "name": "anthropic",
+        "model": "claude-sonnet-4-6"
+      },
+      {
+        "name": "openai",
+        "model": "gpt-5.4"
+      },
+      {
+        "name": "google",
+        "model": "gemini-3.1-pro-preview"
+      }
     ],
-    "grader": { "name": "openai", "model": "gpt-4o" }
+    "grader": {
+      "name": "anthropic",
+      "model": "claude-sonnet-4-6"
+    }
   },
   "runs": [
     {
-      "eval_id": 1,
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "eval_id": 2,
+      "provider": "openai",
+      "model": "gpt-5.4",
       "run_number": 1,
       "result": {
-        "pass_rate": 1.0,
+        "pass_rate": 1,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 9.879,
+        "input_tokens": 3180,
+        "output_tokens": 568,
+        "total_tokens": 3748,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.028680000000000004
+      },
+      "expectations": [
+        {
+          "text": "The agent identifies SQL injection as a critical security issue",
+          "passed": true,
+          "evidence": "In Step 1, the agent explicitly states: 'The most critical issue is a SQL injection vulnerability in app.py around get_user().' and identifies the f-string interpolation as the problem."
+        },
+        {
+          "text": "The agent explains why string formatting in SQL queries is dangerous",
+          "passed": true,
+          "evidence": "In Step 1, the agent explains: 'User input is directly interpolated into the SQL query. An attacker could pass malicious input like 1 OR 1=1 and alter the query. Depending on usage, this can expose or manipulate database data.'"
+        },
+        {
+          "text": "After the follow-up, the agent creates app_fixed.py",
+          "passed": true,
+          "evidence": "In Step 2, the agent calls write_file with path 'app_fixed.py' and the tool returns success:true. The output files section confirms app_fixed.py was created."
+        },
+        {
+          "text": "app_fixed.py uses parameterized queries instead of string formatting",
+          "passed": true,
+          "evidence": "In app_fixed.py, the get_user function uses 'cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))' instead of the original f-string interpolation."
+        }
+      ],
+      "claims": [],
+      "eval_feedback": "The agent performed excellently on all assertions. It correctly identified SQL injection as the most critical issue, explained the danger clearly with a concrete example, created the fixed file after the follow-up, and properly implemented parameterized queries in the fix.",
+      "error": null
+    },
+    {
+      "eval_id": 1,
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
         "passed": 6,
         "failed": 0,
         "total": 6,
-        "time_seconds": 12.4,
-        "input_tokens": 2800,
-        "output_tokens": 1200,
-        "total_tokens": 4000,
+        "time_seconds": 16.381,
+        "input_tokens": 3390,
+        "output_tokens": 1173,
+        "total_tokens": 4563,
         "tool_calls": 3,
         "errors": 0,
-        "cost_usd": 0.0125
+        "cost_usd": 0.0433425
       },
       "expectations": [
-        { "text": "The agent identifies the SQL injection vulnerability in get_user", "passed": true, "evidence": "Review mentions SQL injection via f-string formatting in get_user." },
-        { "text": "The agent identifies the path traversal risk in save_file", "passed": true, "evidence": "Review flags unsanitized filename concatenation in save_file." },
-        { "text": "The agent flags the hardcoded API key (API_KEY = 'sk-...')", "passed": true, "evidence": "Review lists hardcoded API_KEY as a critical secret exposure." },
-        { "text": "The agent flags the hardcoded password in authenticate", "passed": true, "evidence": "Review identifies hardcoded password comparison." },
-        { "text": "The agent writes a review.md file with organized findings", "passed": true, "evidence": "write_file called with path 'review.md'." },
-        { "text": "The review categorizes findings by severity", "passed": true, "evidence": "review.md contains Critical, Warning, and Suggestion sections." }
+        {
+          "text": "The agent identifies the SQL injection vulnerability in get_user",
+          "passed": true,
+          "evidence": "In review.md under Critical section item 1: 'SQL injection vulnerability' - explicitly identifies that get_user builds the SQL query using an f-string and that user_id injection is possible, with fix recommendation to use parameterized queries."
+        },
+        {
+          "text": "The agent identifies the path traversal risk in save_file",
+          "passed": true,
+          "evidence": "In review.md under Critical section item 2: 'Path traversal / arbitrary file write' - explicitly identifies that save_file concatenates filename directly into a filesystem path and gives example of '../../etc/passwd' attack vector."
+        },
+        {
+          "text": "The agent flags the hardcoded API key (API_KEY = 'sk-...')",
+          "passed": true,
+          "evidence": "In review.md under Critical section item 3: 'Hardcoded secrets in source code' - explicitly mentions both API_KEY and the admin password are hardcoded, referencing lines ~23 and ~26."
+        },
+        {
+          "text": "The agent flags the hardcoded password in authenticate",
+          "passed": true,
+          "evidence": "In review.md under Critical section item 3 and Warning section item 2: The hardcoded password 'admin123' in authenticate is flagged both as a hardcoded secret and as a plaintext password comparison issue."
+        },
+        {
+          "text": "The agent writes a review.md file with organized findings",
+          "passed": true,
+          "evidence": "The agent calls write_file with path 'review.md' and the tool returns success:true. The output file review.md is shown with structured sections including Critical, Warning, and Suggestion categories."
+        },
+        {
+          "text": "The review categorizes findings by severity",
+          "passed": true,
+          "evidence": "review.md is organized into three severity levels: '## Critical' (SQL injection, path traversal, hardcoded secrets), '## Warning' (unclosed DB connection, plaintext password, missing error handling), and '## Suggestion' (unused import, style issues)."
+        }
       ],
-      "claims": [
-        "Found 4 security issues",
-        "Wrote structured review.md"
-      ],
-      "eval_feedback": null,
+      "claims": [],
+      "eval_feedback": "The agent performed a thorough code review, correctly identifying all required security issues and organizing them by severity in a well-structured review.md file. All six assertions are clearly satisfied by the transcript evidence.",
       "error": null
     },
     {
       "eval_id": 1,
-      "provider": "openai",
-      "model": "gpt-4o",
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
       "run_number": 1,
       "result": {
-        "pass_rate": 0.833,
-        "passed": 5,
-        "failed": 1,
+        "pass_rate": 1,
+        "passed": 6,
+        "failed": 0,
         "total": 6,
-        "time_seconds": 15.2,
-        "input_tokens": 3100,
-        "output_tokens": 1050,
-        "total_tokens": 4150,
-        "tool_calls": 2,
+        "time_seconds": 24.146,
+        "input_tokens": 4270,
+        "output_tokens": 1121,
+        "total_tokens": 5391,
+        "tool_calls": 3,
         "errors": 0,
-        "cost_usd": 0.0148
+        "cost_usd": 0.021992
       },
       "expectations": [
-        { "text": "The agent identifies the SQL injection vulnerability in get_user", "passed": true, "evidence": "Review correctly identifies SQL injection." },
-        { "text": "The agent identifies the path traversal risk in save_file", "passed": true, "evidence": "Review mentions path traversal." },
-        { "text": "The agent flags the hardcoded API key (API_KEY = 'sk-...')", "passed": true, "evidence": "Review flags the hardcoded secret." },
-        { "text": "The agent flags the hardcoded password in authenticate", "passed": true, "evidence": "Review mentions hardcoded password." },
-        { "text": "The agent writes a review.md file with organized findings", "passed": true, "evidence": "write_file created review.md." },
-        { "text": "The review categorizes findings by severity", "passed": false, "evidence": "Findings are listed but not categorized by severity level." }
+        {
+          "text": "The agent identifies the SQL injection vulnerability in get_user",
+          "passed": true,
+          "evidence": "The review.md explicitly identifies 'SQL Injection Vulnerability' as a Critical issue, pointing to line 7 in get_user where f-string query construction is used, and provides a fix using parameterized queries."
+        },
+        {
+          "text": "The agent identifies the path traversal risk in save_file",
+          "passed": true,
+          "evidence": "The review.md explicitly identifies 'Path Traversal Vulnerability' as a Critical issue, pointing to line 13 in save_file where filename is directly concatenated to the path, and provides a fix using os.path.basename and os.path.join."
+        },
+        {
+          "text": "The agent flags the hardcoded API key (API_KEY = 'sk-...')",
+          "passed": true,
+          "evidence": "The review.md identifies 'Hardcoded Secrets and Credentials' as a Critical issue, specifically mentioning the API_KEY at line 25 and recommending use of environment variables instead."
+        },
+        {
+          "text": "The agent flags the hardcoded password in authenticate",
+          "passed": true,
+          "evidence": "The review.md identifies the hardcoded password 'admin123' in the authenticate function at line 28 as part of the 'Hardcoded Secrets and Credentials' Critical issue, recommending environment variables as a fix."
+        },
+        {
+          "text": "The agent writes a review.md file with organized findings",
+          "passed": true,
+          "evidence": "The agent calls write_file with path 'review.md' and the tool returns success:true. The output file review.md is shown with structured sections including headings, bullet points, code examples, and organized findings."
+        },
+        {
+          "text": "The review categorizes findings by severity",
+          "passed": true,
+          "evidence": "The review.md is organized into three severity categories: '## Critical' (SQL injection, path traversal, hardcoded secrets), '## Warning' (database connection resource leak), and '## Suggestion' (unpythonic iteration and comparison)."
+        }
       ],
-      "claims": [
-        "Identified all security issues",
-        "Created review but without severity categories"
+      "claims": [],
+      "eval_feedback": "The agent performed an excellent code review, identifying all required security vulnerabilities and organizing them clearly by severity in the review.md file. All six assertions are fully satisfied.",
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 29.883,
+        "input_tokens": 6958,
+        "output_tokens": 1101,
+        "total_tokens": 8059,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.027128
+      },
+      "expectations": [
+        {
+          "text": "The agent identifies SQL injection as a critical security issue",
+          "passed": true,
+          "evidence": "In Step 2, the agent explicitly states: 'The most critical issue in the file is the SQL Injection vulnerability in the get_user function (Line 6).' It also lists it under '## Critical' in the review.md file written in Step 1."
+        },
+        {
+          "text": "The agent explains why string formatting in SQL queries is dangerous",
+          "passed": true,
+          "evidence": "In Step 2, the agent explains: 'This allows an attacker to pass malicious SQL commands as the user_id (e.g., 1 OR 1=1), potentially exposing the entire database, modifying data, or bypassing authentication.' The review.md also notes it 'makes the application highly vulnerable to SQL injection attacks.'"
+        },
+        {
+          "text": "After the follow-up, the agent creates app_fixed.py",
+          "passed": true,
+          "evidence": "In Step 3, the agent calls write_file with path 'app_fixed.py' and the tool result confirms success: {\"success\":true}. The agent also confirms in Step 4: 'The corrected code has been written to app_fixed.py.'"
+        },
+        {
+          "text": "app_fixed.py uses parameterized queries instead of string formatting",
+          "passed": true,
+          "evidence": "In the app_fixed.py content written in Step 3, the f-string query is replaced with: query = \"SELECT * FROM users WHERE id = ?\" and cursor.execute(query, (user_id,)), which is a proper parameterized query using SQLite's placeholder syntax."
+        }
       ],
-      "eval_feedback": "The review identified all issues but did not organize them by severity as required.",
+      "claims": [],
+      "eval_feedback": "The agent performed excellently across all assertions. It correctly identified SQL injection as the most critical issue, explained the danger clearly, created the fixed file after the follow-up, and properly implemented parameterized queries in the fix.",
       "error": null
     },
     {
       "eval_id": 2,
       "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-sonnet-4-6",
       "run_number": 1,
       "result": {
-        "pass_rate": 1.0,
+        "pass_rate": 1,
         "passed": 4,
         "failed": 0,
         "total": 4,
-        "time_seconds": 18.6,
-        "input_tokens": 4200,
-        "output_tokens": 1800,
-        "total_tokens": 6000,
+        "time_seconds": 33.549,
+        "input_tokens": 13732,
+        "output_tokens": 1994,
+        "total_tokens": 15726,
         "tool_calls": 4,
         "errors": 0,
-        "cost_usd": 0.0195
+        "cost_usd": 0.071106
       },
       "expectations": [
-        { "text": "The agent identifies SQL injection as a critical security issue", "passed": true, "evidence": "Agent explicitly called SQL injection the most critical issue." },
-        { "text": "The agent explains why string formatting in SQL queries is dangerous", "passed": true, "evidence": "Explanation covers arbitrary SQL execution via user-controlled input." },
-        { "text": "After the follow-up, the agent creates app_fixed.py", "passed": true, "evidence": "write_file called with path 'app_fixed.py'." },
-        { "text": "app_fixed.py uses parameterized queries instead of string formatting", "passed": true, "evidence": "Fixed code uses cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))." }
+        {
+          "text": "The agent identifies SQL injection as a critical security issue",
+          "passed": true,
+          "evidence": "In Step 2, the agent explicitly states '## Most Critical Issue: SQL Injection (Line 7)' and in review.md labels it '🔴 Critical' with '### 1. SQL Injection — `get_user()` (Line 7)'"
+        },
+        {
+          "text": "The agent explains why string formatting in SQL queries is dangerous",
+          "passed": true,
+          "evidence": "The agent explains: 'User-supplied input (`user_id`) is interpolated directly into the SQL query string. An attacker can pass a malicious value like `1 OR 1=1` or `1; DROP TABLE users;` to manipulate or destroy the database.' It also gives concrete attack examples in Step 2."
+        },
+        {
+          "text": "After the follow-up, the agent creates app_fixed.py",
+          "passed": true,
+          "evidence": "In Step 4, the agent calls write_file with path 'app_fixed.py' and the tool returns success:true. The file contents are also shown in the output files section."
+        },
+        {
+          "text": "app_fixed.py uses parameterized queries instead of string formatting",
+          "passed": true,
+          "evidence": "In app_fixed.py, the f-string query is replaced with 'query = \"SELECT * FROM users WHERE id = ?\"' and 'cursor.execute(query, (user_id,))' — using SQLite's parameterized query syntax instead of string interpolation."
+        }
       ],
-      "claims": [
-        "Identified SQL injection as top priority",
-        "Wrote corrected version with parameterized queries"
-      ],
+      "claims": [],
       "eval_feedback": null,
       "error": null
     },
     {
-      "eval_id": 2,
-      "provider": "openai",
-      "model": "gpt-4o",
+      "eval_id": 1,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
       "run_number": 1,
       "result": {
-        "pass_rate": 1.0,
-        "passed": 4,
+        "pass_rate": 1,
+        "passed": 6,
         "failed": 0,
-        "total": 4,
-        "time_seconds": 20.1,
-        "input_tokens": 4500,
-        "output_tokens": 1600,
-        "total_tokens": 6100,
+        "total": 6,
+        "time_seconds": 39.607,
+        "input_tokens": 7751,
+        "output_tokens": 2550,
+        "total_tokens": 10301,
         "tool_calls": 3,
         "errors": 0,
-        "cost_usd": 0.0210
+        "cost_usd": 0.061503
       },
       "expectations": [
-        { "text": "The agent identifies SQL injection as a critical security issue", "passed": true, "evidence": "Agent flagged SQL injection as the most severe vulnerability." },
-        { "text": "The agent explains why string formatting in SQL queries is dangerous", "passed": true, "evidence": "Detailed explanation of injection attacks via user input." },
-        { "text": "After the follow-up, the agent creates app_fixed.py", "passed": true, "evidence": "Created app_fixed.py via write_file." },
-        { "text": "app_fixed.py uses parameterized queries instead of string formatting", "passed": true, "evidence": "Uses ? placeholders with tuple parameters." }
+        {
+          "text": "The agent identifies the SQL injection vulnerability in get_user",
+          "passed": true,
+          "evidence": "The agent explicitly identifies 'SQL Injection — get_user() (Line 7)' as Critical Issue #1, noting that 'User-supplied input is interpolated directly into the SQL query string' via f-string and provides a fix using parameterized queries."
+        },
+        {
+          "text": "The agent identifies the path traversal risk in save_file",
+          "passed": true,
+          "evidence": "The agent explicitly identifies 'Path Traversal Vulnerability — save_file() (Line 13)' as Critical Issue #3, explaining that '../' sequences in filename can allow writing to arbitrary filesystem locations, and provides a fix using os.path.basename() and path validation."
+        },
+        {
+          "text": "The agent flags the hardcoded API key (API_KEY = 'sk-...')",
+          "passed": true,
+          "evidence": "The agent explicitly identifies 'Hardcoded API Key — (Line 25)' as Critical Issue #4, noting 'API_KEY = \"sk-1234567890abcdef\"' exposes secrets in source code and version control, and recommends using environment variables."
+        },
+        {
+          "text": "The agent flags the hardcoded password in authenticate",
+          "passed": true,
+          "evidence": "The agent explicitly identifies 'Hardcoded Password in Authentication — authenticate() (Line 28)' as Critical Issue #5, noting the password 'admin123' is hardcoded in plaintext and is a backdoor, recommending bcrypt hashing and environment variables."
+        },
+        {
+          "text": "The agent writes a review.md file with organized findings",
+          "passed": true,
+          "evidence": "The agent calls write_file with path 'review.md' and the tool returns success:true. The content is well-organized with sections for Critical Issues, Warnings, and Suggestions, each with numbered findings, code examples, and fixes."
+        },
+        {
+          "text": "The review categorizes findings by severity",
+          "passed": true,
+          "evidence": "The review.md clearly categorizes findings into three severity levels: '🔴 Critical Issues' (5 items including SQL injection, path traversal, hardcoded secrets), '🟡 Warnings' (1 item for unused import), and '🔵 Suggestions' (2 items for code quality)."
+        }
       ],
-      "claims": [
-        "SQL injection identified as critical",
-        "Parameterized queries applied in fix"
-      ],
-      "eval_feedback": null,
+      "claims": [],
+      "eval_feedback": "The agent performed an excellent and thorough code review, identifying all required security vulnerabilities and organizing them clearly by severity in the review.md file. All six assertions are fully satisfied.",
       "error": null
     }
   ],
   "provider_summary": {
-    "anthropic:claude-sonnet-4-20250514": {
-      "pass_rate": { "mean": 1.0, "stddev": 0.0 },
-      "time_seconds": { "mean": 15.5, "stddev": 3.1 },
-      "total_tokens": { "mean": 5000, "stddev": 1000.0 },
-      "cost_usd": { "mean": 0.0160, "stddev": 0.0035 }
+    "gpt-5.4": {
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0
+      },
+      "time_seconds": {
+        "mean": 13.129999999999999,
+        "stddev": 4.597608291274932
+      },
+      "total_tokens": {
+        "mean": 4155.5,
+        "stddev": 576.2920266670362
+      },
+      "cost_usd": {
+        "mean": 0.03601125,
+        "stddev": 0.01036795317914775
+      }
     },
-    "openai:gpt-4o": {
-      "pass_rate": { "mean": 0.917, "stddev": 0.083 },
-      "time_seconds": { "mean": 17.65, "stddev": 2.45 },
-      "total_tokens": { "mean": 5125, "stddev": 975.0 },
-      "cost_usd": { "mean": 0.0179, "stddev": 0.0031 }
+    "gemini-3.1-pro-preview": {
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0
+      },
+      "time_seconds": {
+        "mean": 27.014499999999998,
+        "stddev": 4.056671603667222
+      },
+      "total_tokens": {
+        "mean": 6725,
+        "stddev": 1886.5608922057088
+      },
+      "cost_usd": {
+        "mean": 0.02456,
+        "stddev": 0.0036317004281741067
+      }
+    },
+    "claude-sonnet-4-6": {
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0
+      },
+      "time_seconds": {
+        "mean": 36.578,
+        "stddev": 4.283652880428105
+      },
+      "total_tokens": {
+        "mean": 13013.5,
+        "stddev": 3836.0542879370205
+      },
+      "cost_usd": {
+        "mean": 0.0663045,
+        "stddev": 0.0067903464197344165
+      }
     }
   },
   "notes": []

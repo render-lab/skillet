@@ -1,8 +1,11 @@
 import path from "node:path";
 import { Command } from "commander";
+import { runCompare } from "./commands/compare.js";
+import { runFixtures } from "./commands/fixtures.js";
 import { runGenerate } from "./commands/generate.js";
 import { runInit } from "./commands/init.js";
 import { runRun } from "./commands/run.js";
+import { runScaffold } from "./commands/scaffold.js";
 import { runServe } from "./commands/serve.js";
 import { runValidate } from "./commands/validate.js";
 import { loadDotenv } from "./config.js";
@@ -37,6 +40,26 @@ program
 	});
 
 program
+	.command("fixtures [skill]")
+	.description("Generate fixture files referenced by evals.json using an LLM")
+	.option("--evals <path>", "Path to evals.json")
+	.option("--config <path>", "Path to skill-eval.yaml")
+	.action(async (skill, opts) => {
+		loadEnvForSkill(skill);
+		await runFixtures({ ...opts, skill });
+	});
+
+program
+	.command("scaffold [skill]")
+	.description("Generate evals and fixture files in one step (generate + fixtures)")
+	.option("--count <n>", "Number of evals to generate", "3")
+	.option("--config <path>", "Path to skill-eval.yaml")
+	.action(async (skill, opts) => {
+		loadEnvForSkill(skill);
+		await runScaffold({ ...opts, skill });
+	});
+
+program
 	.command("validate [skill]")
 	.description("Pre-flight checks: verify skill directory, evals, and API keys")
 	.option("--evals <path>", "Path to evals.json")
@@ -68,6 +91,7 @@ program
 	.option("--runs <n>", "Runs per provider per eval", "1")
 	.option("--timeout <seconds>", "Timeout per eval in seconds", "300")
 	.option("--concurrency <n>", "Max concurrent eval runs (default: all, max 10)")
+	.option("--golden <path>", "Golden benchmark file to compare against for regression")
 	.action(async (skill, opts) => {
 		loadEnvForSkill(skill);
 		try {
@@ -78,6 +102,13 @@ program
 			console.error(pc.default.red(`Error: ${extractErrorMessage(err)}`));
 			process.exit(1);
 		}
+	});
+
+program
+	.command("compare <golden> <current>")
+	.description("Compare two benchmark JSON files and report pass rate regressions")
+	.action((golden, current) => {
+		runCompare(golden, current);
 	});
 
 program.parse();

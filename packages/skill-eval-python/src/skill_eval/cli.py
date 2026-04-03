@@ -86,6 +86,7 @@ def run(
     runs: int | None = typer.Option(None, "--runs", help="Runs per provider per eval"),
     timeout: float | None = typer.Option(None, "--timeout", help="Timeout per eval in seconds"),
     concurrency: int | None = typer.Option(None, "--concurrency", help="Max concurrent eval runs"),
+    golden: str | None = typer.Option(None, "--golden", help="Golden benchmark file to compare against for regression"),
 ) -> None:
     """Run evals across configured providers."""
     _load_env_for_skill(skill)
@@ -104,6 +105,7 @@ def run(
             runs=runs,
             timeout=timeout,
             concurrency=concurrency,
+            golden=golden,
         )
         try:
             await run_run(opts)
@@ -118,6 +120,17 @@ def run(
             raise typer.Exit(1) from None
 
     asyncio.run(_run())
+
+
+@app.command()
+def compare(
+    golden: str = typer.Argument(..., help="Path to golden benchmark JSON"),
+    current: str = typer.Argument(..., help="Path to current benchmark JSON"),
+) -> None:
+    """Compare two benchmark JSON files and report pass rate regressions."""
+    from skill_eval.commands.compare import run_compare
+
+    run_compare(golden, current)
 
 
 def _version_callback(value: bool) -> None:

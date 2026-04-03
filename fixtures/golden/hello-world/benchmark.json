@@ -2,153 +2,454 @@
   "metadata": {
     "skill_name": "hello-world",
     "skill_path": "fixtures/skills/hello-world",
-    "timestamp": "2025-01-15T10:30:00.000Z",
-    "evals_run": [1, 2, 3],
+    "timestamp": "2026-03-16T05:11:51.991Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
     "runs_per_provider": 1,
     "providers": [
-      { "name": "anthropic", "model": "claude-sonnet-4-20250514" }
+      {
+        "name": "anthropic",
+        "model": "claude-sonnet-4-6"
+      },
+      {
+        "name": "openai",
+        "model": "gpt-5.4"
+      },
+      {
+        "name": "google",
+        "model": "gemini-3.1-pro-preview"
+      }
     ],
-    "grader": { "name": "openai", "model": "gpt-4o" }
+    "grader": {
+      "name": "anthropic",
+      "model": "claude-sonnet-4-6"
+    }
   },
   "runs": [
     {
       "eval_id": 1,
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "provider": "openai",
+      "model": "gpt-5.4",
       "run_number": 1,
       "result": {
-        "pass_rate": 1.0,
+        "pass_rate": 1,
         "passed": 3,
         "failed": 0,
         "total": 3,
-        "time_seconds": 4.2,
-        "input_tokens": 1250,
-        "output_tokens": 380,
-        "total_tokens": 1630,
+        "time_seconds": 4.194,
+        "input_tokens": 1403,
+        "output_tokens": 59,
+        "total_tokens": 1462,
         "tool_calls": 2,
         "errors": 0,
-        "cost_usd": 0.0042
+        "cost_usd": 0.0083425
       },
       "expectations": [
         {
           "text": "The agent uses write_file to create hello.txt",
           "passed": true,
-          "evidence": "The agent called write_file with path 'hello.txt' and content 'Hello, World!'"
+          "evidence": "Step 0 shows: Tool call: write_file({\"path\":\"hello.txt\",\"content\":\"Hello, World!\"}) with result {\"success\":true}"
         },
         {
           "text": "The file hello.txt contains exactly 'Hello, World!'",
           "passed": true,
-          "evidence": "File content matches the expected string exactly."
+          "evidence": "The output file section shows '--- hello.txt ---' with content 'Hello, World!' and the read_file result in Step 1 confirms {\"content\":\"Hello, World!\"}"
         },
         {
           "text": "The agent reads the file back or otherwise confirms it was created",
           "passed": true,
-          "evidence": "The agent used read_file on hello.txt and reported the content."
+          "evidence": "Step 1 shows: Tool call: read_file({\"path\":\"hello.txt\"}) returning {\"content\":\"Hello, World!\"}, and Step 2 the assistant explicitly confirms 'Created hello.txt with the content: Hello, World!'"
         }
       ],
-      "claims": [
-        "Created hello.txt with exact content",
-        "Verified file via read_file"
-      ],
+      "claims": [],
       "eval_feedback": null,
       "error": null
     },
     {
       "eval_id": 2,
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "provider": "openai",
+      "model": "gpt-5.4",
       "run_number": 1,
       "result": {
-        "pass_rate": 1.0,
+        "pass_rate": 1,
         "passed": 4,
         "failed": 0,
         "total": 4,
-        "time_seconds": 6.8,
-        "input_tokens": 1480,
-        "output_tokens": 520,
-        "total_tokens": 2000,
-        "tool_calls": 3,
+        "time_seconds": 4.196,
+        "input_tokens": 1422,
+        "output_tokens": 74,
+        "total_tokens": 1496,
+        "tool_calls": 2,
         "errors": 0,
-        "cost_usd": 0.0058
+        "cost_usd": 0.008775
       },
       "expectations": [
         {
           "text": "The agent creates a file called greet.py",
           "passed": true,
-          "evidence": "write_file was called with path 'greet.py'."
+          "evidence": "Step 0: write_file called with path 'greet.py', result was success:true. Output files section confirms greet.py exists."
         },
         {
           "text": "The file contains a print statement that outputs 'Hello from Python!'",
           "passed": true,
-          "evidence": "File contains: print('Hello from Python!')"
+          "evidence": "The file content shown in Output Files is: print('Hello from Python!')"
         },
         {
           "text": "The agent runs the script with bash to verify it works",
           "passed": true,
-          "evidence": "bash tool executed 'python greet.py'."
+          "evidence": "Step 1: bash tool called with command 'python3 greet.py'"
         },
         {
           "text": "The script output includes 'Hello from Python!'",
           "passed": true,
-          "evidence": "bash output: Hello from Python!"
+          "evidence": "Step 1 tool result shows stdout: 'Hello from Python!'"
         }
       ],
-      "claims": [
-        "Created greet.py with correct print statement",
-        "Executed script and confirmed output"
+      "claims": [],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 1,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 6.068,
+        "input_tokens": 3217,
+        "output_tokens": 157,
+        "total_tokens": 3374,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.012006
+      },
+      "expectations": [
+        {
+          "text": "The agent uses write_file to create hello.txt",
+          "passed": true,
+          "evidence": "Step 0 shows: Tool call: write_file({\"path\":\"hello.txt\",\"content\":\"Hello, World!\"}) with result {\"success\":true}"
+        },
+        {
+          "text": "The file hello.txt contains exactly 'Hello, World!'",
+          "passed": true,
+          "evidence": "The output file section shows '--- hello.txt ---' with content 'Hello, World!' and the read_file result confirms {\"content\":\"Hello, World!\"}"
+        },
+        {
+          "text": "The agent reads the file back or otherwise confirms it was created",
+          "passed": true,
+          "evidence": "Step 1 shows: Tool call: read_file({\"path\":\"hello.txt\"}) returning {\"content\":\"Hello, World!\"}, and Step 2 the assistant explicitly confirms the file was created successfully."
+        }
       ],
+      "claims": [],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 3,
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6666666666666666,
+        "passed": 2,
+        "failed": 1,
+        "total": 3,
+        "time_seconds": 4.88,
+        "input_tokens": 1934,
+        "output_tokens": 87,
+        "total_tokens": 2021,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.011627499999999999
+      },
+      "expectations": [
+        {
+          "text": "The agent uses list_directory or bash ls to list the current directory",
+          "passed": true,
+          "evidence": "Step 0 shows: Tool call: list_directory({\"path\":\".\"}), which returned {\"entries\":[]}"
+        },
+        {
+          "text": "The agent creates a file called summary.txt",
+          "passed": true,
+          "evidence": "Step 1 shows: Tool call: write_file({\"path\":\"summary.txt\",\"content\":\"\"}), which returned {\"success\":true}"
+        },
+        {
+          "text": "summary.txt contains a directory listing",
+          "passed": false,
+          "evidence": "The summary.txt file is empty (content: \"\"). While the directory was empty, the agent wrote an empty string rather than any representation of the directory listing (e.g., 'empty', '[]', or similar). The output file section confirms summary.txt has no content."
+        }
+      ],
+      "claims": [],
+      "eval_feedback": "The agent correctly listed the directory and created summary.txt, but failed to write the directory listing result into the file. Even though the directory was empty, the agent should have written something meaningful like 'Directory is empty' or '[]' to summary.txt rather than an empty string.",
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 6.082,
+        "input_tokens": 3238,
+        "output_tokens": 203,
+        "total_tokens": 3441,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.012759
+      },
+      "expectations": [
+        {
+          "text": "The agent creates a file called greet.py",
+          "passed": true,
+          "evidence": "Step 0: write_file called with path 'greet.py' and result {\"success\":true}. The output files section also confirms greet.py was created."
+        },
+        {
+          "text": "The file contains a print statement that outputs 'Hello from Python!'",
+          "passed": true,
+          "evidence": "The file content is \"print('Hello from Python!')\\n\" as shown in both the write_file call and the output files section."
+        },
+        {
+          "text": "The agent runs the script with bash to verify it works",
+          "passed": true,
+          "evidence": "Step 1: bash tool called with command 'python3 greet.py'."
+        },
+        {
+          "text": "The script output includes 'Hello from Python!'",
+          "passed": true,
+          "evidence": "Step 1 bash tool result shows {\"stdout\":\"Hello from Python!\"}, confirming the expected output."
+        }
+      ],
+      "claims": [],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 2,
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 8.704,
+        "input_tokens": 1818,
+        "output_tokens": 80,
+        "total_tokens": 1898,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.004596
+      },
+      "expectations": [
+        {
+          "text": "The agent creates a file called greet.py",
+          "passed": true,
+          "evidence": "Step 0: write_file tool called with path='greet.py', result: {\"success\":true}"
+        },
+        {
+          "text": "The file contains a print statement that outputs 'Hello from Python!'",
+          "passed": true,
+          "evidence": "The file content is: print('Hello from Python!') as shown in both the write_file call and the Output Files section"
+        },
+        {
+          "text": "The agent runs the script with bash to verify it works",
+          "passed": true,
+          "evidence": "Step 1: bash tool called with command='python3 greet.py'"
+        },
+        {
+          "text": "The script output includes 'Hello from Python!'",
+          "passed": true,
+          "evidence": "Step 1 bash tool result: {\"stdout\":\"Hello from Python!\"}"
+        }
+      ],
+      "claims": [],
       "eval_feedback": null,
       "error": null
     },
     {
       "eval_id": 3,
       "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-sonnet-4-6",
       "run_number": 1,
       "result": {
-        "pass_rate": 1.0,
+        "pass_rate": 1,
         "passed": 3,
         "failed": 0,
         "total": 3,
-        "time_seconds": 5.1,
-        "input_tokens": 1300,
-        "output_tokens": 450,
-        "total_tokens": 1750,
+        "time_seconds": 9.997,
+        "input_tokens": 4609,
+        "output_tokens": 341,
+        "total_tokens": 4950,
         "tool_calls": 3,
         "errors": 0,
-        "cost_usd": 0.0048
+        "cost_usd": 0.018942
       },
       "expectations": [
         {
           "text": "The agent uses list_directory or bash ls to list the current directory",
           "passed": true,
-          "evidence": "bash tool executed 'ls -la' to list directory contents."
+          "evidence": "Step 0 shows the agent calling list_directory({\"path\":\".\"}), which returned {\"entries\":[]}"
         },
         {
           "text": "The agent creates a file called summary.txt",
           "passed": true,
-          "evidence": "write_file called with path 'summary.txt'."
+          "evidence": "Step 1 shows the agent calling write_file({\"path\":\"summary.txt\",...}) with a successful result {\"success\":true}"
         },
         {
           "text": "summary.txt contains a directory listing",
           "passed": true,
-          "evidence": "File contains output of ls showing files in the working directory."
+          "evidence": "The summary.txt file contains 'Directory Listing Summary' and documents the result of the directory listing ('The directory is currently empty. No files or folders were found.'), which accurately reflects the list_directory output of empty entries."
         }
       ],
-      "claims": [
-        "Listed directory with bash ls",
-        "Saved listing to summary.txt"
+      "claims": [],
+      "eval_feedback": "The agent correctly completed all steps: listed the directory, created summary.txt, and the file contains the directory listing result. The listing showed an empty directory, and the summary accurately reflects that.",
+      "error": null
+    },
+    {
+      "eval_id": 1,
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 10.733,
+        "input_tokens": 1795,
+        "output_tokens": 69,
+        "total_tokens": 1864,
+        "tool_calls": 2,
+        "errors": 0,
+        "cost_usd": 0.004418
+      },
+      "expectations": [
+        {
+          "text": "The agent uses write_file to create hello.txt",
+          "passed": true,
+          "evidence": "Step 0 shows: Tool call: write_file({\"content\":\"Hello, World!\",\"path\":\"hello.txt\"}) with result {\"success\":true}"
+        },
+        {
+          "text": "The file hello.txt contains exactly 'Hello, World!'",
+          "passed": true,
+          "evidence": "The output file section shows '--- hello.txt ---' with content 'Hello, World!' and the read_file result confirms {\"content\":\"Hello, World!\"}"
+        },
+        {
+          "text": "The agent reads the file back or otherwise confirms it was created",
+          "passed": true,
+          "evidence": "Step 1 shows: Tool call: read_file({\"path\":\"hello.txt\"}) returning {\"content\":\"Hello, World!\"}, and Step 2 the assistant explicitly states it verified the contents."
+        }
       ],
+      "claims": [],
+      "eval_feedback": null,
+      "error": null
+    },
+    {
+      "eval_id": 3,
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 10.676,
+        "input_tokens": 3055,
+        "output_tokens": 158,
+        "total_tokens": 3213,
+        "tool_calls": 3,
+        "errors": 0,
+        "cost_usd": 0.008006
+      },
+      "expectations": [
+        {
+          "text": "The agent uses list_directory or bash ls to list the current directory",
+          "passed": true,
+          "evidence": "Step 0: Tool call bash({\"command\":\"ls -la\"}) was executed, returning the directory listing."
+        },
+        {
+          "text": "The agent creates a file called summary.txt",
+          "passed": true,
+          "evidence": "Step 1: Tool call write_file({\"path\":\"summary.txt\", ...}) was executed with success:true result."
+        },
+        {
+          "text": "summary.txt contains a directory listing",
+          "passed": true,
+          "evidence": "The summary.txt file content (verified in Step 2 and shown in Output Files) contains the ls -la output: 'total 0\\ndrwx------@   2 raph  staff     64 Mar 15 19:11 .\\ndrwx------@ 693 raph  staff  22176 Mar 15 19:11 ..'"
+        }
+      ],
+      "claims": [],
       "eval_feedback": null,
       "error": null
     }
   ],
   "provider_summary": {
-    "anthropic:claude-sonnet-4-20250514": {
-      "pass_rate": { "mean": 1.0, "stddev": 0.0 },
-      "time_seconds": { "mean": 5.37, "stddev": 1.07 },
-      "total_tokens": { "mean": 1793, "stddev": 151.4 },
-      "cost_usd": { "mean": 0.0049, "stddev": 0.0007 }
+    "gpt-5.4": {
+      "pass_rate": {
+        "mean": 0.8888888888888888,
+        "stddev": 0.1924500897298753
+      },
+      "time_seconds": {
+        "mean": 4.423333333333333,
+        "stddev": 0.39548619866353535
+      },
+      "total_tokens": {
+        "mean": 1659.6666666666667,
+        "stddev": 313.3852793819986
+      },
+      "cost_usd": {
+        "mean": 0.009581666666666667,
+        "stddev": 0.0017848920368843972
+      }
+    },
+    "claude-sonnet-4-6": {
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0
+      },
+      "time_seconds": {
+        "mean": 7.3823333333333325,
+        "stddev": 2.264378575533105
+      },
+      "total_tokens": {
+        "mean": 3921.6666666666665,
+        "stddev": 891.1926465884541
+      },
+      "cost_usd": {
+        "mean": 0.014568999999999999,
+        "stddev": 0.0038057980766194105
+      }
+    },
+    "gemini-3.1-pro-preview": {
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0
+      },
+      "time_seconds": {
+        "mean": 10.037666666666667,
+        "stddev": 1.1553407866657062
+      },
+      "total_tokens": {
+        "mean": 2325,
+        "stddev": 769.2184345164902
+      },
+      "cost_usd": {
+        "mean": 0.005673333333333333,
+        "stddev": 0.0020221081408602587
+      }
     }
   },
   "notes": []

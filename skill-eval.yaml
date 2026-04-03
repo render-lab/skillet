@@ -1,0 +1,18 @@
+providers:
+  - name: anthropic
+    model: claude-sonnet-4-6
+    apiKey: ${ANTHROPIC_API_KEY}
+  - name: openai
+    model: gpt-5.4
+    apiKey: ${OPENAI_API_KEY}
+  - name: google
+    model: gemini-3.1-pro-preview
+    apiKey: ${GOOGLE_API_KEY}
+grader:
+  provider: anthropic
+  model: claude-sonnet-4-6
+settings:
+  maxSteps: 20
+  timeout: 300
+  runsPerProvider: 1
+  temperature: 0

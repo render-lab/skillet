@@ -28,6 +28,7 @@ class RunOpts:
     runs: int | None = None
     timeout: float | None = None
     concurrency: int | None = None
+    golden: str | None = None
 
 
 def build_system_prompt(skill_content: str) -> str:
@@ -99,6 +100,21 @@ async def run_run(opts: RunOpts) -> None:
         len(config.providers),
     )
     _write_outputs(result, config, evals_file, evals, opts, paths)
+
+    if opts.golden:
+        from skill_eval.commands.compare import compare_benchmarks, print_comparison
+        from skill_eval.schemas.benchmark import BenchmarkFile, ProviderSummary
+
+        golden_raw = json.loads(Path(opts.golden).read_text())
+        golden = BenchmarkFile.model_validate(golden_raw)
+        current_summary = {
+            k: ProviderSummary.model_validate(v) if isinstance(v, dict) else v
+            for k, v in provider_summary.items()
+        }
+        results = compare_benchmarks(golden.provider_summary, current_summary)
+        failed = print_comparison(results, opts.golden)
+        if failed:
+            raise SystemExit(1)
 
 
 def _print_run_header(
