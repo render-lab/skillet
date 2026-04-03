@@ -1,5 +1,8 @@
 # Skillet
 
+> [!IMPORTANT]
+> **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
+
 Toolkit for AI agent skills: package management and evaluation.
 
 AI agents work best when given explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, and emit context for the agent runtimes you use.
