@@ -19,12 +19,13 @@ function readPackageVersion() {
 }
 
 function runGit(args, options = {}) {
-	return execFileSync("git", args, {
+	const output = execFileSync("git", args, {
 		cwd: repoRoot,
 		encoding: "utf8",
 		stdio: ["inherit", "pipe", "pipe"],
 		...options,
-	}).trim();
+	});
+	return typeof output === "string" ? output.trim() : "";
 }
 
 function gitRefExists(ref) {
