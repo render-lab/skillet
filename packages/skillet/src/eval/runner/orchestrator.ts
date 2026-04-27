@@ -119,10 +119,10 @@ function computeProviderSummary(runs: BenchmarkRun[]): OrchestratorResult["provi
 }
 
 function formatSuccessLine(
-	completed: number,
-	total: number,
 	entry: RunEntry,
 	result: BenchmarkRun,
+	completed: number,
+	total: number,
 ): string {
 	const r = result.result;
 	const passColor = rateColor(r.pass_rate);
@@ -175,7 +175,6 @@ export async function runOrchestrator(
 
 	const results: BenchmarkRun[] = [];
 	const spinner = new Spinner();
-	let completed = 0;
 
 	async function executeOne(entry: RunEntry): Promise<BenchmarkRun> {
 		const evalTimeoutMs = config.settings.timeout * 1000;
@@ -265,8 +264,9 @@ export async function runOrchestrator(
 			try {
 				const result = await executeOne(entry);
 				results.push(result);
-				completed++;
-				spinner.succeed(id, formatSuccessLine(completed, totalRuns, entry, result));
+				spinner.succeed(id, (completed, total) =>
+					formatSuccessLine(entry, result, completed, total),
+				);
 				return;
 			} catch (err) {
 				attempt++;
@@ -285,10 +285,10 @@ export async function runOrchestrator(
 				}
 
 				results.push(buildFailureResult(entry, errMsg));
-				completed++;
 				spinner.succeed(
 					id,
-					`  ${pc.red("✗")} [${completed}/${totalRuns}] ` +
+					(completed, total) =>
+						`  ${pc.red("✗")} [${completed}/${total}] ` +
 						`eval ${entry.evalCase.id} · ${entry.provider.modelId} · ` +
 						`run ${entry.runNumber} · ${pc.red(errMsg)}`,
 				);

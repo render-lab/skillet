@@ -37,6 +37,15 @@ function formatTools(tools: ToolDefinition[]) {
 	];
 }
 
+function extractTextParts(parts: Array<Record<string, unknown>> | undefined): string {
+	return (
+		parts
+			?.map((part) => (typeof part.text === "string" ? part.text : ""))
+			.filter(Boolean)
+			.join("") ?? ""
+	);
+}
+
 export class GoogleProvider extends BaseProvider {
 	readonly name = "google";
 	private readonly ai: GoogleGenAI;
@@ -94,7 +103,10 @@ export class GoogleProvider extends BaseProvider {
 			},
 		});
 
-		const text = response.text ?? "";
+		const rawParts = response.candidates?.[0]?.content?.parts as
+			| Array<Record<string, unknown>>
+			| undefined;
+		const text = extractTextParts(rawParts);
 		const toolCalls: ToolCall[] = (response.functionCalls ?? []).map((fc, i) => ({
 			id: `${fc.name}_${i}`,
 			name: fc.name ?? "",
@@ -103,7 +115,6 @@ export class GoogleProvider extends BaseProvider {
 
 		const hasToolCalls = toolCalls.length > 0;
 		const usage = response.usageMetadata;
-		const rawParts = response.candidates?.[0]?.content?.parts;
 
 		let stopReason: ChatResponse["stopReason"] = "end";
 		if (hasToolCalls) stopReason = "tool_use";

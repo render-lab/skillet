@@ -45,6 +45,8 @@ interface ActiveTask {
 	startTime: number;
 }
 
+type CompletionLine = string | ((completed: number, total: number) => string);
+
 export class Spinner {
 	private frameIdx = 0;
 	private timer: ReturnType<typeof setInterval> | null = null;
@@ -106,11 +108,12 @@ export class Spinner {
 	}
 
 	/** Mark a task as completed and print its result line. */
-	succeed(id: string, line: string) {
+	succeed(id: string, line: CompletionLine) {
 		this.active.delete(id);
 		this.completed++;
 		if (this.isInteractive) this.clearLines();
-		process.stdout.write(`${line}\n`);
+		const renderedLine = typeof line === "function" ? line(this.completed, this.total) : line;
+		process.stdout.write(`${renderedLine}\n`);
 	}
 
 	stop() {
