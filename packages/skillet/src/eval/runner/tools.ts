@@ -1,4 +1,4 @@
-import { exec, type ExecException } from "node:child_process";
+import { type ExecException, exec } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import type { ToolHandler } from "../providers/types.js";

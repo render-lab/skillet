@@ -163,12 +163,8 @@ describe("runAgentLoop", () => {
 
 		await runPromise;
 
-		expect(onActivity).toHaveBeenCalledWith(
-			"turn 1/2 — checking turn relevance for turn 2/2…",
-		);
-		expect(onActivity).toHaveBeenCalledWith(
-			"turn 1/2 — checking turn relevance for turn 2/2… 5s",
-		);
+		expect(onActivity).toHaveBeenCalledWith("turn 1/2 — checking turn relevance for turn 2/2…");
+		expect(onActivity).toHaveBeenCalledWith("turn 1/2 — checking turn relevance for turn 2/2… 5s");
 	});
 
 	it("does not let a multi-turn tool call stall sibling runs", async () => {
