@@ -5,9 +5,14 @@
 	"type": "module",
 	"author": "Render",
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/render-lab/skillet.git",
+		"directory": "packages/skillet"
+	},
 	"files": ["dist", "README.md", "LICENSE"],
 	"bin": {
-		"skillet": "./dist/cli.cjs"
+		"skillet": "dist/cli.cjs"
 	},
 	"publishConfig": {
 		"access": "public"
