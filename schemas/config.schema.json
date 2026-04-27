@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "SkillEvalConfig",
-  "description": "Schema for skill-eval.yaml configuration files",
+  "title": "SkilletEvalConfig",
+  "description": "Schema for skillet.eval.yaml configuration files",
   "type": "object",
   "required": ["providers"],
   "properties": {

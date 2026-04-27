@@ -4,6 +4,6 @@ dist/
 __pycache__/
 *.egg-info/
 .env
-.skill-evals/
+.skillet-evals/
 *.tsbuildinfo
 .DS_Store

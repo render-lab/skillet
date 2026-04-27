@@ -3,14 +3,16 @@
 > [!IMPORTANT]
 > **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
 
-Toolkit for AI agent skills: package management and evaluation.
+Toolkit for AI agent skills: dependency management, runtime context emission, and cross-provider evaluation.
 
-AI agents work best when given explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, and emit context for the agent runtimes you use.
+AI agents work best when given explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, emit runtime-specific context, and benchmark how well a model actually follows those instructions.
 
-The repo contains two complementary tools:
+## One CLI, two workflows
 
-- **`agent-skills`** manages skill dependencies, lockfiles, and multi-runtime context emission.
-- **`skill-eval`** evaluates skills across LLM providers with sandboxed agent loops and LLM-judge grading.
+Skillet now exposes a single CLI:
+
+- `skillet ...` for package-management workflows
+- `skillet eval ...` for evaluation workflows
 
 ## How skills work
 
@@ -36,11 +38,9 @@ Be thorough but concise. Focus on actionable findings, not nitpicks.
 
 Skills live in GitHub repositories at paths like `owner/repo/skills/my-skill`. You reference them with specifiers like `owner/repo/skills/my-skill@^1.0.0`.
 
-## The `agent-skills` CLI
+## Package management
 
-### Manifest
-
-Running `agent-skills init` creates a `skills.json` manifest in your project:
+Running `skillet init` creates a `skills.json` manifest in your project:
 
 ```json
 {
@@ -59,20 +59,20 @@ Running `agent-skills init` creates a `skills.json` manifest in your project:
 
 Each entry in `skills` maps a GitHub skill path to a version range. The `config` block declares which agent runtimes to target and how context is injected.
 
-### Commands
+### Core commands
 
 ```bash
-agent-skills init                # Create a skills.json manifest
-agent-skills add owner/repo/skill@^1.0   # Add a skill dependency
-agent-skills install             # Resolve all dependencies and write the lockfile
-agent-skills emit                # Emit context files for your configured runtimes
-agent-skills update              # Update skills to the latest matching versions
-agent-skills status              # Show installed skills and their state
+skillet init
+skillet add owner/repo/skill@^1.0
+skillet install
+skillet emit --target cursor
+skillet update
+skillet status
 ```
 
 ### Lockfile
 
-`agent-skills install` writes a `skills.lock` file that pins every skill by SHA256 content hash. This ensures reproducible installs across machines and CI environments, regardless of upstream changes.
+`skillet install` writes a `skills.lock` file that pins every skill by SHA256 content hash. This ensures reproducible installs across machines and CI environments, regardless of upstream changes.
 
 ### Injection strategies
 
@@ -84,7 +84,7 @@ The `inject` config controls how skill context is loaded by the agent:
 
 ### Emit targets
 
-`agent-skills emit` generates runtime-specific context files. Supported targets:
+`skillet emit` generates runtime-specific context files. Supported targets:
 
 | Target | Output |
 | --- | --- |
@@ -96,11 +96,9 @@ The `inject` config controls how skill context is loaded by the agent:
 | `cline` | `.clinerules` |
 | `generic` | `agent-context.md` |
 
-See [`packages/agent-skills/README.md`](packages/agent-skills/README.md) for full documentation.
+## Evaluation
 
-## The `skill-eval` CLI
-
-`skill-eval` measures how well an agent follows a skill's instructions. It runs an actual agent loop (with tool calls for bash, file read, and file write) inside a sandboxed temp directory, then grades the output with an LLM judge.
+`skillet eval` measures how well an agent follows a skill's instructions. It runs an actual agent loop, with tool calls for bash and file I/O, inside a sandboxed temp directory and grades the resulting transcript with an LLM judge.
 
 ### Eval definitions
 
@@ -126,29 +124,25 @@ Each skill can include an `evals.json` file with test cases:
 
 Evals support single prompts and multi-turn conversations via a `turns` array.
 
-### Commands
+### Eval commands
 
 ```bash
-skill-eval init                  # Scaffold a skill-eval.yaml config
-skill-eval generate ./my-skill   # Generate evals.json from a SKILL.md
-skill-eval validate ./my-skill   # Check skill dir, evals, and API keys
-skill-eval run ./my-skill        # Run evals across providers and grade results
-skill-eval serve ./my-skill      # Launch a dashboard to view results
+skillet eval init
+skillet eval generate ./my-skill
+skillet eval validate ./my-skill
+skillet eval run ./my-skill
+skillet eval serve ./my-skill
 ```
 
-### Provider support
+`skillet eval` runs evals against Anthropic, OpenAI, and Google models. Configure API keys via environment variables such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GOOGLE_API_KEY`. By default, eval config lives in `skillet.eval.yaml`, and results are written to `.skillet-evals/results/<skill-name>/`.
 
-`skill-eval` runs evals against Anthropic, OpenAI, and Google models. Configure API keys via environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). Results are written to `.skill-evals/results/<skill-name>/` as timestamped `benchmark.json` files.
-
-A Python implementation with the same CLI and behavior is available in [`packages/skill-eval-python`](packages/skill-eval-python/).
-
-See [`packages/skill-eval/README.md`](packages/skill-eval/README.md) for full documentation.
+The TypeScript implementation lives in `packages/skillet/`, with eval internals under `src/eval/`. A Python reference implementation lives in `packages/skillet-eval-python/`.
 
 ## Comparison with Vercel `npx skills`
 
 Vercel's [`npx skills`](https://github.com/vercel-labs/skills) is a popular tool in the same space. Both projects solve the same core problem: managing reusable context for AI agents. They make different trade-offs:
 
-| Aspect | `agent-skills` | Vercel `npx skills` |
+| Aspect | `skillet` | Vercel `npx skills` |
 | --- | --- | --- |
 | Dependency model | Declarative manifest with version ranges | Imperative add/remove |
 | Lockfile | SHA256 content-hash pinning | In progress (global/project lock split) |
@@ -158,19 +152,18 @@ Vercel's [`npx skills`](https://github.com/vercel-labs/skills) is a popular tool
 | Agent support | 7 targets | 40+ agents |
 | Onboarding | Requires `init` and a manifest | Zero-config `npx` |
 
-`agent-skills` prioritizes reproducibility and eval-gated quality. Vercel's tool prioritizes breadth and zero-friction onboarding. They're complementary rather than competing.
+Skillet prioritizes reproducibility and eval-gated quality. Vercel's tool prioritizes breadth and zero-friction onboarding. They're complementary rather than competing.
 
 ## Project structure
 
-```
+```text
 skillet/
 ├── packages/
-│   ├── agent-skills/          # CLI for dependency management and context emission
-│   ├── skill-eval/            # TypeScript eval engine (Anthropic, OpenAI, Google)
-│   └── skill-eval-python/     # Python eval engine (same CLI and behavior)
+│   ├── skillet/               # Main TypeScript CLI package and eval engine
+│   └── skillet-eval-python/   # Python reference eval engine
 ├── schemas/                   # Shared JSON schemas (evals, benchmarks, config, grading)
 ├── fixtures/
-│   ├── skills/                # Sample skill definitions for testing the eval engine
+│   ├── skills/                # Sample skill definitions for eval testing
 │   └── golden/                # Reference benchmark outputs for regression testing
 ├── skills.json                # This repo's own skill manifest (dogfooding)
 └── skills.lock                # Pinned skill versions
@@ -191,18 +184,16 @@ pnpm test
 Try the eval engine on a fixture skill:
 
 ```bash
-# Run evals for the code-review skill
-skill-eval run fixtures/skills/code-review
+skillet eval run fixtures/skills/code-review
 ```
 
 Or manage skills in your own project:
 
 ```bash
-# Initialize a manifest, add a skill, install, and emit
-agent-skills init
-agent-skills add R4ph-t/opinionated-vibe-coding/skills/ovc-audit@2.0
-agent-skills install
-agent-skills emit --target cursor
+skillet init
+skillet add R4ph-t/opinionated-vibe-coding/skills/ovc-audit@2.0
+skillet install
+skillet emit --target cursor
 ```
 
 ## License
