@@ -5,9 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Experimental](https://img.shields.io/badge/status-experimental-orange)
 
-<img src="assets/skillet.png" alt="Keep your agent skills fresh and tasty" width="240">
+<img src="assets/skillet.png" alt="Keep your agent skills tasty" width="240">
 
-*Keep your agent skills fresh and tasty*
+*Keep your agent skills tasty*
 
 > [!IMPORTANT]
 > **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
