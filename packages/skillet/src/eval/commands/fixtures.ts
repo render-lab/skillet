@@ -114,7 +114,9 @@ async function runFixturesForSkill(opts: {
 	const filePaths = collectFilePaths(evalsFile.evals);
 
 	if (filePaths.length === 0) {
-		prompts.log.info(`No fixture files referenced in ${pc.bold(paths.skillDir)} — nothing to generate.`);
+		prompts.log.info(
+			`No fixture files referenced in ${pc.bold(paths.skillDir)} — nothing to generate.`,
+		);
 		return;
 	}
 

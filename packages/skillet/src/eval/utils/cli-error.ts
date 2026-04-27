@@ -4,7 +4,11 @@ function exampleSkillArg(skillArg: string) {
 	return skillArg === "." ? "./path-to-skill" : skillArg;
 }
 
-export function formatMissingSkillFileMessage(command: string, skillArg: string, skillFile: string) {
+export function formatMissingSkillFileMessage(
+	command: string,
+	skillArg: string,
+	skillFile: string,
+) {
 	return [
 		pc.red(`SKILL.md not found at ${skillFile}`),
 		"",

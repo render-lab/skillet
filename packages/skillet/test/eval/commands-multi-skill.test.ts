@@ -19,7 +19,17 @@ async function createSkill(rootDir: string, name: string, version?: string) {
 	await mkdir(skillDir, { recursive: true });
 	await writeFile(
 		path.join(skillDir, "SKILL.md"),
-		["---", `name: ${name}`, ...(version ? [`version: ${version}`] : []), "---", "", `# ${name}`, "", "Do the task.", ""].join("\n"),
+		[
+			"---",
+			`name: ${name}`,
+			...(version ? [`version: ${version}`] : []),
+			"---",
+			"",
+			`# ${name}`,
+			"",
+			"Do the task.",
+			"",
+		].join("\n"),
 	);
 	await writeFile(
 		path.join(skillDir, "evals.json"),
@@ -161,7 +171,10 @@ describe("multi-skill eval commands", () => {
 		const jsonFile = skillAFiles.find((file) => file.endsWith(".json"));
 		expect(jsonFile).toBeDefined();
 		const benchmark = JSON.parse(
-			await readFile(path.join(tmpDir, ".skillet-evals", "results", "skill-a", jsonFile ?? ""), "utf-8"),
+			await readFile(
+				path.join(tmpDir, ".skillet-evals", "results", "skill-a", jsonFile ?? ""),
+				"utf-8",
+			),
 		);
 		expect(benchmark.metadata.skill_version).toBe("1.2.3");
 		expect(benchmark.metadata.skill_sha256).toMatch(/^[a-f0-9]{64}$/);

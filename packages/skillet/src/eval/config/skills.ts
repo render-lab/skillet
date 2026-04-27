@@ -55,7 +55,9 @@ export function discoverSkillsFromRoots(roots: string[]): string[] {
 function pathEndsWithSegments(candidatePath: string, suffix: string[]) {
 	const segments = candidatePath.split(path.sep).filter(Boolean);
 	if (segments.length < suffix.length) return false;
-	return suffix.every((segment, index) => segments[segments.length - suffix.length + index] === segment);
+	return suffix.every(
+		(segment, index) => segments[segments.length - suffix.length + index] === segment,
+	);
 }
 
 function relativePath(projectDir: string, target: string) {
@@ -102,7 +104,10 @@ export function suggestSkillRoots(projectDir: string): string[] {
 	return skillDirs.map((skillDir) => relativePath(absProjectDir, path.dirname(skillDir)));
 }
 
-export function resolveSkillSelection(explicitSkills: string[] | undefined, skillRoots: string[]): string[] {
+export function resolveSkillSelection(
+	explicitSkills: string[] | undefined,
+	skillRoots: string[],
+): string[] {
 	if (explicitSkills && explicitSkills.length > 0) {
 		return explicitSkills.map((skill) => path.resolve(skill));
 	}

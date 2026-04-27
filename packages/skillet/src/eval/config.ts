@@ -1,7 +1,11 @@
 export { loadDotenv, resolveApiKey } from "./config/env.js";
 export { loadConfig } from "./config/loader.js";
 export { findProjectRoot, resolveSkillPaths } from "./config/paths.js";
-export { discoverSkillsFromRoots, resolveSkillSelection, suggestSkillRoots } from "./config/skills.js";
+export {
+	discoverSkillsFromRoots,
+	resolveSkillSelection,
+	suggestSkillRoots,
+} from "./config/skills.js";
 export {
 	PROVIDER_REGISTRY,
 	DEFAULT_MODELS,

@@ -1,23 +1,27 @@
 import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
-import { PROVIDER_REGISTRY, loadConfig, resolveSkillPaths, resolveSkillSelection } from "../config.js";
+import { extractSkillVersion } from "../../schemas/skill.js";
+import { parseFrontmatter } from "../../utils/frontmatter.js";
+import { hashString } from "../../utils/hash.js";
+import {
+	PROVIDER_REGISTRY,
+	loadConfig,
+	resolveSkillPaths,
+	resolveSkillSelection,
+} from "../config.js";
 import { printResults } from "../report/console-reporter.js";
-import { writeDashboard } from "../report/html-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
 import { runOrchestrator } from "../runner/orchestrator.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { type EvalCase, EvalsFileSchema, getTurns } from "../schemas/evals.js";
 import {
+	exitWithMissingFile,
 	formatMissingEvalsFileMessage,
 	formatMissingSkillFileMessage,
-	exitWithMissingFile,
 } from "../utils/cli-error.js";
 import { extractErrorMessage } from "../utils/error.js";
 import { VERSION } from "../version.js";
-import { extractSkillVersion } from "../../schemas/skill.js";
-import { parseFrontmatter } from "../../utils/frontmatter.js";
-import { hashString } from "../../utils/hash.js";
 import { compareBenchmarks, printComparison } from "./compare.js";
 
 export interface RunOpts {
@@ -72,7 +76,7 @@ export async function runRun(opts: RunOpts) {
 	if (multipleSkills) {
 		console.log(pc.bold("\nMulti-skill eval run\n"));
 		console.log(`  Skills:    ${skills.length}`);
-		console.log(`  Scope:     all selected skills`);
+		console.log("  Scope:     all selected skills");
 		console.log("");
 	}
 
@@ -212,7 +216,8 @@ function printRunHeader(
 	skillMeta: ReturnType<typeof resolveSkillRunMetadata>,
 ) {
 	console.log(pc.bold(`\n  skillet eval v${VERSION}\n`));
-	const overall = (opts as RunOpts & { overall?: { skillIndex: number; skillTotal: number } }).overall;
+	const overall = (opts as RunOpts & { overall?: { skillIndex: number; skillTotal: number } })
+		.overall;
 	if (overall) {
 		console.log(`  Progress:  skill ${overall.skillIndex} of ${overall.skillTotal}`);
 	}
@@ -228,7 +233,9 @@ function printRunHeader(
 	}
 	console.log(`  Runs:      ${config.settings.runsPerProvider} per provider`);
 	console.log(`  Grader:    ${config.grader.model}`);
-	console.log(`  Version:   ${skillMeta.skillVersion} ${pc.dim(`(${skillMeta.skillSha256.slice(0, 8)})`)}`);
+	console.log(
+		`  Version:   ${skillMeta.skillVersion} ${pc.dim(`(${skillMeta.skillSha256.slice(0, 8)})`)}`,
+	);
 	console.log("");
 }
 
@@ -258,9 +265,6 @@ function writeOutputs(
 	const jsonPath = path.join(resultsDir, `${stamp}.json`);
 	writeBenchmarkJson(result, config, meta, jsonPath);
 	console.log(`  ${pc.green("✓")} ${jsonPath}`);
-
-	writeDashboard(resultsDir);
-	console.log(`  ${pc.green("✓")} ${path.join(resultsDir, "index.html")} ${pc.dim("(dashboard)")}`);
 
 	console.log(
 		`\n  ${pc.dim(`Run ${pc.bold(`skillet eval serve ${opts.skill}`)} to view results in the browser`)}\n`,

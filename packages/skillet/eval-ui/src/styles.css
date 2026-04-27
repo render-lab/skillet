@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+	--color-pass: #22c55e;
+	--color-warn: #eab308;
+	--color-fail: #ef4444;
+}
+
+:root {
+	color-scheme: dark;
+}
+
+html,
+body,
+#app {
+	min-height: 100%;
+}
+
+body {
+	background: #000;
+}
+
+a,
+button {
+	transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+canvas {
+	max-height: 18rem;
+}
