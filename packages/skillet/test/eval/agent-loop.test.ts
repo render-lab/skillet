@@ -51,9 +51,9 @@ describe("runAgentLoop", () => {
 
 		await runPromise;
 
-		expect(onActivity).toHaveBeenCalledWith("step 1 — calling model…");
-		expect(onActivity).toHaveBeenCalledWith("step 1 — still waiting on model… 1s");
-		expect(onActivity).toHaveBeenCalledWith("step 1 — still waiting on model… 2s");
+		expect(onActivity).toHaveBeenCalledWith("turn 1/1 — step 1 — calling model…");
+		expect(onActivity).toHaveBeenCalledWith("turn 1/1 — step 1 — still waiting on model… 1s");
+		expect(onActivity).toHaveBeenCalledWith("turn 1/1 — step 1 — still waiting on model… 2s");
 	});
 
 	it("injects the next scripted turn when relevance check passes", async () => {
