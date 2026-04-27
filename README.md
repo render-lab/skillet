@@ -1,5 +1,10 @@
 # Skillet
 
+[![npm version](https://img.shields.io/npm/v/skillet)](https://www.npmjs.com/package/skillet)
+[![Node.js 20+](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Experimental](https://img.shields.io/badge/status-experimental-orange)
+
 <img src="assets/skillet.png" alt="Keep your agent skills fresh and tasty" width="240">
 
 *Keep your agent skills fresh and tasty*
@@ -214,6 +219,17 @@ pnpm test
 pnpm typecheck
 pnpm check
 ```
+
+## Releasing
+
+The release workflow runs when you push a tag that matches `v*`.
+
+1. Update `packages/skillet/package.json` to the version you want to release.
+2. Push the release commit to `main`.
+3. Run `pnpm release:tag` to create and push `v<version>` to `origin`.
+4. Wait for GitHub Actions to create the GitHub release, run verification, and upload the package tarball.
+
+If you need to push a different tag explicitly, run `pnpm release:tag 0.1.4` or `pnpm release:tag v0.1.4`.
 
 ## License
 

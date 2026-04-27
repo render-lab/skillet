@@ -6,7 +6,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "check": "pnpm -r check",
-    "check:fix": "pnpm -r check:fix"
+    "check:fix": "pnpm -r check:fix",
+    "release:tag": "node ./scripts/release-tag.mjs"
   },
   "engines": {
     "node": ">=20"
