@@ -51,7 +51,36 @@ export interface IntegrationMockSummary {
 	errors: string[];
 }
 
+export interface IntegrationMockManifest {
+	version: 1;
+	name: string;
+	generatedAt: string;
+	sources: {
+		openapi: string[];
+		mcpServer: string[];
+		expose: Array<"http" | "tools">;
+	};
+	httpRoutes: Array<{
+		key: string;
+		method: string;
+		path: string;
+		params: string[];
+		response?: unknown;
+		responseFromState?: string;
+	}>;
+	tools: Array<{
+		key: string;
+		name: string;
+		description: string;
+		parameters?: JsonObject;
+		response?: unknown;
+		responseFromState?: string;
+	}>;
+	errors: string[];
+}
+
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
+const DEFAULT_MANIFEST_ROOT = path.join(".skillet-evals", "integrations");
 
 function asArray(value: string | string[] | undefined): string[] {
 	if (!value) return [];
@@ -62,13 +91,40 @@ function isUrl(value: string): boolean {
 	return /^https?:\/\//i.test(value);
 }
 
+function githubReadmeUrl(source: string): string | undefined {
+	const match = source.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/.*)?$/i);
+	if (!match) return undefined;
+	return `https://raw.githubusercontent.com/${match[1]}/${match[2].replace(/\.git$/, "")}/main/README.md`;
+}
+
 async function readJsonSource(source: string): Promise<unknown> {
 	if (isUrl(source)) {
 		const response = await fetch(source);
 		if (!response.ok) throw new Error(`Failed to fetch ${source}: ${response.status}`);
-		return response.json();
+		const contentType = response.headers.get("content-type") ?? "";
+		const text = await response.text();
+		if (!contentType.includes("json") && /^\s*</.test(text)) {
+			throw new Error(
+				`${source} returned HTML, not JSON. Use a raw OpenAPI JSON/YAML URL or a local spec file.`,
+			);
+		}
+		return JSON.parse(text);
 	}
-	return JSON.parse(fs.readFileSync(source, "utf-8"));
+	const text = fs.readFileSync(source, "utf-8");
+	if (/^\s*</.test(text)) {
+		throw new Error(`${source} contains HTML, not JSON. Use an OpenAPI JSON file.`);
+	}
+	return JSON.parse(text);
+}
+
+async function readTextSource(source: string): Promise<string> {
+	const readmeUrl = githubReadmeUrl(source);
+	if (isUrl(source) || readmeUrl) {
+		const response = await fetch(readmeUrl ?? source);
+		if (!response.ok) throw new Error(`Failed to fetch ${source}: ${response.status}`);
+		return response.text();
+	}
+	return fs.readFileSync(source, "utf-8");
 }
 
 function routeParams(routePath: string): string[] {
@@ -163,10 +219,109 @@ function toolFromDescriptor(
 	};
 }
 
-function importMcpToolDescriptors(integration: string, sources: string[]): ToolMockDefinition[] {
+function jsonSchemaType(type: string): string {
+	if (type === "number" || type === "integer" || type === "boolean" || type === "array")
+		return type;
+	return "string";
+}
+
+function importMcpToolsFromReadme(integration: string, content: string): ToolMockDefinition[] {
+	const tools: ToolMockDefinition[] = [];
+	const lines = content.split(/\r?\n/);
+	let current:
+		| {
+				name: string;
+				description: string;
+				properties: JsonObject;
+				required: string[];
+		  }
+		| undefined;
+
+	const flush = () => {
+		if (!current) return;
+		tools.push({
+			integration,
+			name: current.name,
+			description: current.description,
+			parameters: {
+				type: "object",
+				properties: current.properties,
+				...(current.required.length > 0 ? { required: current.required } : {}),
+			},
+		});
+		current = undefined;
+	};
+
+	for (const line of lines) {
+		const toolMatch = line.match(/^-\s+\*\*([a-zA-Z0-9_]+)\*\*\s+-\s+(.+)$/);
+		if (toolMatch) {
+			flush();
+			current = {
+				name: toolMatch[1] ?? "",
+				description: toolMatch[2] ?? "Mock integration tool",
+				properties: {},
+				required: [],
+			};
+			continue;
+		}
+
+		if (!current) continue;
+		const paramMatch = line.match(
+			/^\s*-\s+`([^`]+)`:\s+(.+?)\s+\(([^,)]+)(?:,\s*(required|optional))?\)/i,
+		);
+		if (!paramMatch) continue;
+		const [, paramName, description, type, requiredness] = paramMatch;
+		if (!paramName || !description || !type) continue;
+		current.properties[paramName] = {
+			type: jsonSchemaType(type.toLowerCase()),
+			description,
+		};
+		if (requiredness?.toLowerCase() === "required") current.required.push(paramName);
+	}
+
+	flush();
+	return tools;
+}
+
+export function integrationMockManifestRoot(projectRoot = process.cwd()): string {
+	return path.resolve(projectRoot, DEFAULT_MANIFEST_ROOT);
+}
+
+function integrationMockManifestPath(rootDir: string, name: string): string {
+	return path.join(rootDir, name, "manifest.json");
+}
+
+function loadIntegrationMockManifest(
+	rootDir: string,
+	name: string,
+): IntegrationMockManifest | undefined {
+	const manifestPath = integrationMockManifestPath(rootDir, name);
+	if (!fs.existsSync(manifestPath)) return undefined;
+	return JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as IntegrationMockManifest;
+}
+
+async function importMcpToolDescriptors(
+	integration: string,
+	sources: string[],
+): Promise<ToolMockDefinition[]> {
 	const tools: ToolMockDefinition[] = [];
 	for (const source of sources) {
-		const files = fs.statSync(source).isDirectory() ? readJsonFiles(source) : [source];
+		if (isUrl(source)) {
+			const readmeUrl = githubReadmeUrl(source);
+			if (!readmeUrl) {
+				throw new Error(
+					`${source} is a URL. Use a GitHub repo URL, a README URL, or a local path containing MCP tool descriptor JSON files.`,
+				);
+			}
+			tools.push(...importMcpToolsFromReadme(integration, await readTextSource(readmeUrl)));
+			continue;
+		}
+		const stat = fs.statSync(source);
+		const readmePath = stat.isDirectory() ? path.join(source, "README.md") : undefined;
+		if (readmePath && fs.existsSync(readmePath)) {
+			tools.push(...importMcpToolsFromReadme(integration, fs.readFileSync(readmePath, "utf-8")));
+		}
+		const files = stat.isDirectory() ? readJsonFiles(source) : [source];
 		for (const file of files) {
 			try {
 				const descriptor = JSON.parse(fs.readFileSync(file, "utf-8"));
@@ -331,76 +486,151 @@ async function buildRuntimeIntegration(
 	name: string,
 	config: MockIntegrationConfig,
 	scenario: EvalIntegrationScenario,
+	manifest?: IntegrationMockManifest,
 ): Promise<RuntimeIntegration> {
-	const routes = config.expose.includes("http")
-		? await importOpenApiRoutes(name, asArray(config.openapi))
-		: [];
-	const descriptorTools = config.expose.includes("tools")
-		? importMcpToolDescriptors(name, asArray(config.mcpServer))
-		: [];
-	const explicitTools: ToolMockDefinition[] = config.tools.map((tool: MockToolConfig) => ({
-		integration: name,
-		name: tool.name,
-		description: tool.description,
-		parameters: tool.parameters as JsonObject | undefined,
-		response: tool.response,
-		responseFromState: tool.responseFromState,
-	}));
-	return {
-		name,
-		config,
-		scenario,
-		state: { ...scenario.state },
-		routes,
-		tools: [...descriptorTools, ...explicitTools],
-	};
-}
-
-export async function summarizeIntegrationMockSources(
-	configs: Record<string, MockIntegrationConfig>,
-): Promise<IntegrationMockSummary[]> {
-	const summaries: IntegrationMockSummary[] = [];
-	for (const [name, config] of Object.entries(configs)) {
-		const summary: IntegrationMockSummary = {
-			name,
-			httpRoutes: [],
-			tools: [],
-			errors: [],
-		};
-
-		if (config.expose.includes("http")) {
-			try {
-				const routes = await importOpenApiRoutes(name, asArray(config.openapi));
-				summary.httpRoutes = routes.map((route) => ({
-					key: `${route.method} ${route.path}`,
-					params: route.params,
-				}));
-			} catch (err) {
-				summary.errors.push(`OpenAPI import failed: ${extractErrorMessage(err)}`);
-			}
-		}
-
-		if (config.expose.includes("tools")) {
-			try {
-				const descriptorTools = importMcpToolDescriptors(name, asArray(config.mcpServer));
-				const explicitTools: ToolMockDefinition[] = config.tools.map((tool: MockToolConfig) => ({
+	const routes = manifest
+		? manifest.httpRoutes.map((route) => ({
+				integration: name,
+				method: route.method,
+				path: route.path,
+				params: route.params,
+				response: route.response,
+				responseFromState: route.responseFromState,
+			}))
+		: config.expose.includes("http")
+			? await importOpenApiRoutes(name, asArray(config.openapi))
+			: [];
+	const tools = manifest
+		? manifest.tools.map((tool) => ({
+				integration: name,
+				name: tool.name,
+				description: tool.description,
+				parameters: tool.parameters,
+				response: tool.response,
+				responseFromState: tool.responseFromState,
+			}))
+		: [
+				...(config.expose.includes("tools")
+					? await importMcpToolDescriptors(name, asArray(config.mcpServer))
+					: []),
+				...config.tools.map((tool: MockToolConfig) => ({
 					integration: name,
 					name: tool.name,
 					description: tool.description,
 					parameters: tool.parameters as JsonObject | undefined,
 					response: tool.response,
 					responseFromState: tool.responseFromState,
-				}));
-				summary.tools = [...descriptorTools, ...explicitTools].map((tool) => ({
-					key: `tool:${tool.name}`,
-					description: tool.description,
-				}));
-			} catch (err) {
-				summary.errors.push(`MCP tool import failed: ${extractErrorMessage(err)}`);
-			}
-		}
+				})),
+			];
+	return {
+		name,
+		config,
+		scenario,
+		state: { ...scenario.state },
+		routes,
+		tools,
+	};
+}
 
-		summaries.push(summary);
+export async function buildIntegrationMockManifest(
+	name: string,
+	config: MockIntegrationConfig,
+): Promise<IntegrationMockManifest> {
+	const errors: string[] = [];
+	let routes: RouteDefinition[] = [];
+	let tools: ToolMockDefinition[] = [];
+
+	if (config.expose.includes("http")) {
+		try {
+			routes = await importOpenApiRoutes(name, asArray(config.openapi));
+		} catch (err) {
+			errors.push(`OpenAPI import failed: ${extractErrorMessage(err)}`);
+		}
+	}
+
+	if (config.expose.includes("tools")) {
+		try {
+			tools = await importMcpToolDescriptors(name, asArray(config.mcpServer));
+		} catch (err) {
+			errors.push(`MCP tool import failed: ${extractErrorMessage(err)}`);
+		}
+	}
+
+	tools.push(
+		...config.tools.map((tool: MockToolConfig) => ({
+			integration: name,
+			name: tool.name,
+			description: tool.description,
+			parameters: tool.parameters as JsonObject | undefined,
+			response: tool.response,
+			responseFromState: tool.responseFromState,
+		})),
+	);
+
+	return {
+		version: 1,
+		name,
+		generatedAt: new Date().toISOString(),
+		sources: {
+			openapi: asArray(config.openapi),
+			mcpServer: asArray(config.mcpServer),
+			expose: config.expose,
+		},
+		httpRoutes: routes.map((route) => ({
+			key: `${route.method} ${route.path}`,
+			method: route.method,
+			path: route.path,
+			params: route.params,
+			response: route.response,
+			responseFromState: route.responseFromState,
+		})),
+		tools: tools.map((tool) => ({
+			key: `tool:${tool.name}`,
+			name: tool.name,
+			description: tool.description,
+			parameters: tool.parameters,
+			response: tool.response,
+			responseFromState: tool.responseFromState,
+		})),
+		errors,
+	};
+}
+
+export async function writeIntegrationMockManifests(
+	configs: Record<string, MockIntegrationConfig>,
+	rootDir = integrationMockManifestRoot(),
+): Promise<IntegrationMockManifest[]> {
+	const manifests: IntegrationMockManifest[] = [];
+	for (const [name, config] of Object.entries(configs)) {
+		const manifest = await buildIntegrationMockManifest(name, config);
+		const manifestPath = integrationMockManifestPath(rootDir, name);
+		fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
+		fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+		manifests.push(manifest);
+	}
+	return manifests;
+}
+
+export async function summarizeIntegrationMockSources(
+	configs: Record<string, MockIntegrationConfig>,
+	rootDir = integrationMockManifestRoot(),
+): Promise<IntegrationMockSummary[]> {
+	const summaries: IntegrationMockSummary[] = [];
+	for (const [name, config] of Object.entries(configs)) {
+		const manifest = loadIntegrationMockManifest(rootDir, name);
+		const summarySource = manifest ?? (await buildIntegrationMockManifest(name, config));
+		summaries.push({
+			name,
+			httpRoutes: summarySource.httpRoutes.map((route) => ({
+				key: route.key,
+				params: route.params,
+			})),
+			tools: summarySource.tools.map((tool) => ({
+				key: tool.key,
+				description: tool.description,
+			})),
+			errors: summarySource.errors,
+		});
 	}
 	return summaries;
 }
@@ -408,6 +638,7 @@ export async function summarizeIntegrationMockSources(
 export async function createIntegrationMockEnvironment(
 	configs: Record<string, MockIntegrationConfig>,
 	scenarios: Record<string, EvalIntegrationScenario>,
+	opts: { manifestRoot?: string } = {},
 ): Promise<IntegrationMockEnvironment> {
 	const requested = Object.entries(scenarios).filter(([name]) => configs[name]);
 	if (requested.length === 0) {
@@ -424,7 +655,12 @@ export async function createIntegrationMockEnvironment(
 		requested.map(([name, scenario]) => {
 			const config = configs[name];
 			if (!config) throw new Error(`Integration "${name}" is not configured`);
-			return buildRuntimeIntegration(name, config, scenario);
+			return buildRuntimeIntegration(
+				name,
+				config,
+				scenario,
+				loadIntegrationMockManifest(opts.manifestRoot ?? integrationMockManifestRoot(), name),
+			);
 		}),
 	);
 

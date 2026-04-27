@@ -1,9 +1,13 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { MockIntegrationConfig } from "../../src/eval/config/schema.js";
-import { createIntegrationMockEnvironment } from "../../src/eval/runner/integration-mocks.js";
+import {
+	createIntegrationMockEnvironment,
+	summarizeIntegrationMockSources,
+	writeIntegrationMockManifests,
+} from "../../src/eval/runner/integration-mocks.js";
 import type { EvalIntegrationScenario } from "../../src/eval/schemas/evals.js";
 
 describe("createIntegrationMockEnvironment", () => {
@@ -123,5 +127,72 @@ describe("createIntegrationMockEnvironment", () => {
 		} finally {
 			await env.cleanup();
 		}
+	});
+
+	it("imports MCP tools from a README when descriptors are not available", async () => {
+		const dir = await mkdtemp(path.join(tmpdir(), "skillet-readme-mcp-"));
+		dirs.push(dir);
+		await writeFile(
+			path.join(dir, "README.md"),
+			[
+				"# Example MCP Server",
+				"",
+				"## Tools",
+				"",
+				"- **get_metrics** - Get performance metrics for a resource",
+				" - `resourceId`: The ID of the resource to get metrics for (string, required)",
+				" - `metricTypes`: Which metrics to fetch (array, required)",
+				"",
+			].join("\n"),
+		);
+		const config: Record<string, MockIntegrationConfig> = {
+			render: { mcpServer: dir, expose: ["tools"], tools: [] },
+		};
+
+		const manifests = await writeIntegrationMockManifests(config, dir);
+
+		expect(manifests[0]?.tools).toEqual([
+			expect.objectContaining({
+				key: "tool:get_metrics",
+				name: "get_metrics",
+				parameters: expect.objectContaining({
+					required: ["resourceId", "metricTypes"],
+				}),
+			}),
+		]);
+	});
+
+	it("writes materialized manifests and summarizes from them", async () => {
+		const { openapiPath, mcpDir } = await makeSources();
+		const manifestRoot = await mkdtemp(path.join(tmpdir(), "skillet-integration-manifests-"));
+		dirs.push(manifestRoot);
+		const config: Record<string, MockIntegrationConfig> = {
+			render: { openapi: openapiPath, mcpServer: mcpDir, expose: ["http", "tools"], tools: [] },
+		};
+
+		const manifests = await writeIntegrationMockManifests(config, manifestRoot);
+		const manifestPath = path.join(manifestRoot, "render", "manifest.json");
+
+		expect(manifests[0]).toMatchObject({
+			name: "render",
+			httpRoutes: expect.arrayContaining([expect.objectContaining({ key: "GET /services/{id}" })]),
+			tools: expect.arrayContaining([expect.objectContaining({ key: "tool:list_services" })]),
+		});
+		const manifest = JSON.parse(await readFile(manifestPath, "utf-8"));
+		expect(manifest.sources).toMatchObject({
+			openapi: [openapiPath],
+			mcpServer: [mcpDir],
+			expose: ["http", "tools"],
+		});
+
+		const summaries = await summarizeIntegrationMockSources({}, manifestRoot);
+		expect(summaries).toEqual([]);
+
+		const configBackedSummaries = await summarizeIntegrationMockSources(config, manifestRoot);
+		expect(configBackedSummaries[0]).toMatchObject({
+			name: "render",
+			httpRoutes: expect.arrayContaining([expect.objectContaining({ key: "GET /services/{id}" })]),
+			tools: expect.arrayContaining([expect.objectContaining({ key: "tool:list_services" })]),
+		});
 	});
 });

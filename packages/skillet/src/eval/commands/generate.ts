@@ -14,6 +14,7 @@ import { PRICING } from "../providers/pricing.js";
 import {
 	type IntegrationMockSummary,
 	summarizeIntegrationMockSources,
+	writeIntegrationMockManifests,
 } from "../runner/integration-mocks.js";
 import { Spinner } from "../runner/spinner.js";
 import { EvalsFileSchema, getTurns } from "../schemas/evals.js";
@@ -230,6 +231,9 @@ export async function runGenerate(opts: GenerateOpts) {
 	);
 
 	const provider = createProvider(config.providers[0]);
+	if (Object.keys(config.integrations).length > 0) {
+		await writeIntegrationMockManifests(config.integrations);
+	}
 	const integrationSummaries = await summarizeIntegrationMockSources(config.integrations);
 
 	prompts.log.info(`Generator: ${pc.bold(provider.modelId)}`);

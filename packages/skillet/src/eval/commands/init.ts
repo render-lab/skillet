@@ -3,7 +3,8 @@ import path from "node:path";
 import * as prompts from "@clack/prompts";
 import pc from "picocolors";
 import YAML from "yaml";
-import { PROVIDER_REGISTRY, suggestSkillRoots } from "../config.js";
+import { ConfigFileSchema, PROVIDER_REGISTRY, suggestSkillRoots } from "../config.js";
+import { writeIntegrationMockManifests } from "../runner/integration-mocks.js";
 import { exitIfCancelled } from "../utils/prompt.js";
 
 interface InitIntegration {
@@ -202,5 +203,10 @@ export async function runInit() {
 	}
 
 	fs.writeFileSync(outputPath, yamlStr);
+	if (Object.keys(integrations).length > 0) {
+		const parsedConfig = ConfigFileSchema.parse(config);
+		const manifests = await writeIntegrationMockManifests(parsedConfig.integrations);
+		prompts.log.success(`Wrote ${manifests.length} integration mock manifest(s)`);
+	}
 	prompts.outro(`${pc.green("✓")} Wrote ${outputPath}`);
 }

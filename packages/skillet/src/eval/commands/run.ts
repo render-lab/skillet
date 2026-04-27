@@ -12,6 +12,7 @@ import {
 } from "../config.js";
 import { printResults } from "../report/console-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
+import { writeIntegrationMockManifests } from "../runner/integration-mocks.js";
 import { runOrchestrator } from "../runner/orchestrator.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { type EvalCase, EvalsFileSchema, getTurns } from "../schemas/evals.js";
@@ -161,6 +162,13 @@ async function runSingleSkill(
 		if (evals.length === 0) {
 			throw new Error(pc.red(`No evals found with IDs: ${opts.evalId}`));
 		}
+	}
+
+	if (
+		Object.keys(config.integrations).length > 0 &&
+		evals.some((evalCase) => Object.keys(evalCase.integrations).length > 0)
+	) {
+		await writeIntegrationMockManifests(config.integrations);
 	}
 
 	printRunHeader(opts, paths, evals, config, skillMeta);

@@ -102,6 +102,8 @@ integrations:
 
 Keep reusable source information in `skillet.eval.yaml`. Put per-test data in `evals.json`.
 
+Skillet also materializes each configured integration under `.skillet-evals/integrations/<name>/manifest.json`. The manifest records the imported OpenAPI route keys, MCP-style tool keys, source paths, and import errors. `skillet eval init`, `skillet eval generate`, and `skillet eval run` refresh this manifest from the configured sources.
+
 `skillet eval generate` also reads configured integration sources. When integrations are present, the generator prompt includes imported OpenAPI route keys and MCP-style tool keys so generated evals can include matching scenario `state` and `overrides`.
 
 #### Add Scenario Data To Evals
@@ -171,9 +173,9 @@ For example:
 
 #### MCP-Style Tool Import
 
-When you expose `tools`, Skillet reads tool descriptor JSON files from the configured MCP server path. Descriptor files should include at least a `name`; `description` and JSON Schema-style `arguments` are used when present.
+When you expose `tools`, Skillet imports tool definitions from the configured MCP server source. The source can be a GitHub repo URL, a local repo/path with a README tool list, or a directory of tool descriptor JSON files. README import supports tool lists in the common format `- **tool_name** - Description` followed by parameter bullets.
 
-Example descriptor:
+Example descriptor JSON:
 
 ```json
 {
@@ -247,6 +249,8 @@ For static responses, use `response`:
 Integration mocks do not use your real MCP tools or real external account. They are generated from the configured sources and scenario data for each eval run.
 
 Each eval run gets its own isolated mock state and local HTTP server. Parallel evals do not share mock state.
+
+The generated manifests are inspectable build artifacts. Commit them only if you want a stable imported surface in version control; otherwise, regenerate them from `skillet.eval.yaml`.
 
 ## Manifest (`skills.json`)
 
