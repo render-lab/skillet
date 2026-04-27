@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import pc from "picocolors";
-import type { ProviderSummary } from "../schemas/benchmark.js";
+import type { BenchmarkFile, ProviderSummary } from "../schemas/benchmark.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { exitWithMissingFile } from "../utils/cli-error.js";
 import { rateColor } from "../utils/rate.js";
@@ -11,6 +11,15 @@ export interface CompareResult {
 	currentRate: number;
 	delta: number;
 	regressed: boolean;
+}
+
+function formatSkillBuild(metadata?: BenchmarkFile["metadata"]): string | null {
+	if (!metadata) return null;
+	const parts: string[] = [];
+	if (metadata.skill_version) parts.push(metadata.skill_version);
+	if (metadata.skill_sha256) parts.push(metadata.skill_sha256.slice(0, 8));
+	if (parts.length === 0) return null;
+	return parts.join(" · ");
 }
 
 /** Pure comparison — no I/O. */
@@ -27,8 +36,28 @@ export function compareBenchmarks(
 }
 
 /** Print a comparison table. Returns `true` if any provider regressed. */
-export function printComparison(results: CompareResult[], goldenPath: string): boolean {
+export function printComparison(
+	results: CompareResult[],
+	goldenPath: string,
+	metadata?: {
+		goldenMetadata?: BenchmarkFile["metadata"];
+		currentMetadata?: BenchmarkFile["metadata"];
+	},
+): boolean {
 	console.log(pc.bold(`\n  Regression check ${pc.dim(`(vs ${goldenPath})`)}\n`));
+	const goldenBuild = formatSkillBuild(metadata?.goldenMetadata);
+	const currentBuild = formatSkillBuild(metadata?.currentMetadata);
+	if (goldenBuild || currentBuild) {
+		const goldenName = metadata?.goldenMetadata?.skill_name ?? "golden";
+		const currentName = metadata?.currentMetadata?.skill_name ?? "current";
+		if (goldenBuild) {
+			console.log(`  Golden:    ${goldenName} ${pc.dim(`(${goldenBuild})`)}`);
+		}
+		if (currentBuild) {
+			console.log(`  Current:   ${currentName} ${pc.dim(`(${currentBuild})`)}`);
+		}
+		console.log("");
+	}
 
 	for (const r of results) {
 		const icon = r.regressed ? pc.red("✗") : pc.green("✓");
@@ -73,6 +102,9 @@ export function runCompare(goldenPath: string, currentPath: string) {
 	const golden = loadBenchmark(goldenPath);
 	const current = loadBenchmark(currentPath);
 	const results = compareBenchmarks(golden.provider_summary, current.provider_summary);
-	const failed = printComparison(results, goldenPath);
+	const failed = printComparison(results, goldenPath, {
+		goldenMetadata: golden.metadata,
+		currentMetadata: current.metadata,
+	});
 	if (failed) process.exit(1);
 }

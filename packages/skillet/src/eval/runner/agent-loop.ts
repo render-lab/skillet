@@ -1,5 +1,5 @@
 import type { LLMProvider, Message, ToolDefinition, ToolHandler } from "../providers/types.js";
-import { withTimeout } from "../utils/async.js";
+import { withHeartbeat, withTimeout } from "../utils/async.js";
 import { extractErrorMessage } from "../utils/error.js";
 import { truncate } from "../utils/string.js";
 import {
@@ -14,6 +14,14 @@ import { type AgentRun, buildAgentRun } from "./transcript.js";
 
 const CHARS_PER_TOKEN = 4;
 const API_CALL_TIMEOUT_MS = 120_000;
+const HEARTBEAT_INTERVAL_MS = 15_000;
+
+function formatElapsed(ms: number): string {
+	const seconds = Math.floor(ms / 1000);
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	return `${minutes}m${seconds % 60}s`;
+}
 
 export interface AgentLoopParams {
 	provider: LLMProvider;
@@ -28,6 +36,7 @@ export interface AgentLoopParams {
 	maxSteps?: number;
 	temperature?: number;
 	onActivity?: (detail: string) => void;
+	heartbeatIntervalMs?: number;
 	/** When provided, called before injecting the next scripted turn to verify
 	 *  the reply makes sense given the agent's last response. Return false to
 	 *  stop injecting turns (conversation ends early). */
@@ -35,7 +44,16 @@ export interface AgentLoopParams {
 }
 
 export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
-	const { provider, system, tools, toolHandlers, maxSteps = 20, temperature, onActivity } = params;
+	const {
+		provider,
+		system,
+		tools,
+		toolHandlers,
+		maxSteps = 20,
+		temperature,
+		onActivity,
+		heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS,
+	} = params;
 
 	const turns = params.turns ?? (params.userPrompt ? [params.userPrompt] : []);
 	if (!turns.length) throw new Error("No user turns provided");
@@ -71,10 +89,17 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 			}
 		}
 
-		const response = await withTimeout(
-			provider.chat({ system, messages, tools, temperature }),
-			API_CALL_TIMEOUT_MS,
-			`provider.chat (step ${step + 1})`,
+		const response = await withHeartbeat(
+			withTimeout(
+				provider.chat({ system, messages, tools, temperature }),
+				API_CALL_TIMEOUT_MS,
+				`provider.chat (step ${step + 1})`,
+			),
+			{
+				intervalMs: heartbeatIntervalMs,
+				onHeartbeat: (elapsedMs) =>
+					emit(`step ${step + 1} — still waiting on model… ${formatElapsed(elapsedMs)}`),
+			},
 		);
 
 		const transcriptStep: TranscriptStep = {

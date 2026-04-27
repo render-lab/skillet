@@ -51,6 +51,8 @@ export const BenchmarkFileSchema = z.object({
 	metadata: z.object({
 		skill_name: z.string(),
 		skill_path: z.string(),
+		skill_version: z.string().optional(),
+		skill_sha256: z.string().optional(),
 		timestamp: z.string(),
 		evals_run: z.array(z.number()),
 		runs_per_provider: z.number().int(),

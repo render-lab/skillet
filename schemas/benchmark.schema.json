@@ -11,6 +11,8 @@
       "properties": {
         "skill_name": { "type": "string" },
         "skill_path": { "type": "string" },
+        "skill_version": { "type": "string" },
+        "skill_sha256": { "type": "string" },
         "timestamp": { "type": "string" },
         "evals_run": {
           "type": "array",

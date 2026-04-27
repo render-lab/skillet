@@ -127,6 +127,14 @@ describe("withTimeout", () => {
 		await expect(withTimeout(slowPromise, 10, "test op")).rejects.toThrow("test op timed out");
 	});
 
+	it("evaluates timeout labels lazily", async () => {
+		let phase = "calling model";
+		const slowPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+		const timed = withTimeout(slowPromise, 10, () => `eval 1 — ${phase}`);
+		phase = "grading";
+		await expect(timed).rejects.toThrow("eval 1 — grading timed out");
+	});
+
 	it("propagates rejections", async () => {
 		await expect(withTimeout(Promise.reject(new Error("inner")), 1000, "test")).rejects.toThrow(
 			"inner",

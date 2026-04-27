@@ -15,6 +15,7 @@
   },
   "scripts": {
     "prepare": "npm run build",
+    "prepack": "npm run build",
     "build": "tsup",
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",

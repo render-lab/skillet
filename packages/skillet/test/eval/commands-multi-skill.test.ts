@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,12 +14,12 @@ vi.mock("../../src/eval/runner/orchestrator.js", () => ({
 import { runRun } from "../../src/eval/commands/run.js";
 import { runValidate } from "../../src/eval/commands/validate.js";
 
-async function createSkill(rootDir: string, name: string) {
+async function createSkill(rootDir: string, name: string, version?: string) {
 	const skillDir = path.join(rootDir, name);
 	await mkdir(skillDir, { recursive: true });
 	await writeFile(
 		path.join(skillDir, "SKILL.md"),
-		["---", `name: ${name}`, "---", "", `# ${name}`, "", "Do the task.", ""].join("\n"),
+		["---", `name: ${name}`, ...(version ? [`version: ${version}`] : []), "---", "", `# ${name}`, "", "Do the task.", ""].join("\n"),
 	);
 	await writeFile(
 		path.join(skillDir, "evals.json"),
@@ -131,7 +131,7 @@ describe("multi-skill eval commands", () => {
 	});
 
 	it("runs evals for each provided skill and writes separate result folders", async () => {
-		const skillA = await createSkill(tmpDir, "skill-a");
+		const skillA = await createSkill(tmpDir, "skill-a", "1.2.3");
 		const skillB = await createSkill(tmpDir, "skill-b");
 
 		await runRun({
@@ -157,6 +157,14 @@ describe("multi-skill eval commands", () => {
 
 		const resultDirs = await readdir(path.join(tmpDir, ".skillet-evals", "results"));
 		expect(resultDirs.sort()).toEqual(["skill-a", "skill-b"]);
+		const skillAFiles = await readdir(path.join(tmpDir, ".skillet-evals", "results", "skill-a"));
+		const jsonFile = skillAFiles.find((file) => file.endsWith(".json"));
+		expect(jsonFile).toBeDefined();
+		const benchmark = JSON.parse(
+			await readFile(path.join(tmpDir, ".skillet-evals", "results", "skill-a", jsonFile ?? ""), "utf-8"),
+		);
+		expect(benchmark.metadata.skill_version).toBe("1.2.3");
+		expect(benchmark.metadata.skill_sha256).toMatch(/^[a-f0-9]{64}$/);
 	});
 
 	it("discovers all configured skills for validate and run when none are passed", async () => {

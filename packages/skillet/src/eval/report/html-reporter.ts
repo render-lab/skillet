@@ -112,6 +112,14 @@ const fmt = (n, d=2) => Number(n).toFixed(d);
 const HIGH_THRESHOLD = __HIGH_THRESHOLD__;
 const MID_THRESHOLD = __MID_THRESHOLD__;
 const rateClass = (r) => r >= HIGH_THRESHOLD ? "text-green" : r >= MID_THRESHOLD ? "text-yellow" : "text-red";
+const shortHash = (hash) => typeof hash === "string" && hash.length >= 8 ? hash.slice(0, 8) : null;
+const formatBuildLabel = (meta = {}) => {
+  const parts = [];
+  if (meta.skill_version) parts.push(meta.skill_version);
+  const hash = shortHash(meta.skill_sha256);
+  if (hash) parts.push(hash);
+  return parts.length ? parts.join(" · ") : "version unknown";
+};
 
 let runs = []; // sorted newest-first
 let charts = [];
@@ -208,9 +216,10 @@ function renderList() {
 
     const ts = meta.timestamp ? new Date(meta.timestamp).toLocaleString() : entry.run.file;
     const runSkillName = meta.skill_name ?? "Unknown";
+    const buildLabel = formatBuildLabel(meta);
 
     html += '<tr class="run-row" onclick="showRun(' + entry.idx + ')">';
-    html += '<td><div class="timestamp">' + esc(ts) + '</div><div class="file-name">' + esc(runSkillName) + ' · ' + esc(entry.run.file) + '</div></td>';
+    html += '<td><div class="timestamp">' + esc(ts) + '</div><div class="file-name">' + esc(runSkillName) + ' · ' + esc(buildLabel) + ' · ' + esc(entry.run.file) + '</div></td>';
     html += '<td class="text-center ' + rateClass(passRate) + '"><div class="rate-big">' + pct(passRate) + '</div><div class="rate-detail">' + totalPassed + '/' + totalAssertions + '</div></td>';
     html += '<td>' + providers + '</td>';
     html += '<td class="text-center"><button class="btn" onclick="event.stopPropagation();showRun(' + entry.idx + ')">Details</button> <a class="btn btn-dim" href="/' + esc(entry.run.file) + '" onclick="event.stopPropagation()">JSON</a></td>';
@@ -252,10 +261,11 @@ function showRun(idx) {
   const summary = data.provider_summary ?? {};
   const skillName = meta.skill_name ?? "Unknown";
   const ts = meta.timestamp ? new Date(meta.timestamp).toLocaleString() : file;
+  const buildLabel = formatBuildLabel(meta);
 
   let html = '<button class="btn btn-back" onclick="renderList()">← All Runs</button>';
   html += '<h1>Run Details</h1>';
-  html += '<p class="subtitle">' + esc(skillName) + ' — ' + esc(ts) + '</p>';
+  html += '<p class="subtitle">' + esc(skillName) + ' — ' + esc(buildLabel) + ' — ' + esc(ts) + '</p>';
 
   // Provider comparison table
   html += '<h2>Provider Comparison</h2><table><thead><tr><th>Model</th><th class="text-center">Pass Rate</th><th class="text-center">Avg Time</th><th class="text-center">Avg Tokens</th><th class="text-center">Avg Cost</th></tr></thead><tbody>';

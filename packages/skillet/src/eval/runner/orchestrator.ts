@@ -10,7 +10,7 @@ import type { LLMProvider } from "../providers/types.js";
 import type { BenchmarkRun } from "../schemas/benchmark.js";
 import type { EvalCase } from "../schemas/evals.js";
 import type { GradingResult } from "../schemas/grading.js";
-import { withTimeout } from "../utils/async.js";
+import { withHeartbeat, withTimeout } from "../utils/async.js";
 import { extractErrorMessage } from "../utils/error.js";
 import { mean, sleep, stddev } from "../utils/math.js";
 import { rateColor } from "../utils/rate.js";
@@ -41,6 +41,7 @@ export interface OrchestratorResult {
 const MAX_RETRIES = 2;
 const RETRY_BASE_MS = 2000;
 const MAX_CONCURRENCY = 10;
+const PHASE_HEARTBEAT_MS = 15_000;
 
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 529]);
 const RETRYABLE_MESSAGES = ["rate limit", "overloaded", "unavailable", "high demand"];
@@ -178,10 +179,15 @@ export async function runOrchestrator(
 	async function executeOne(entry: RunEntry): Promise<BenchmarkRun> {
 		const evalTimeoutMs = config.settings.timeout * 1000;
 		const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), "skillet-eval-"));
+		let lastDetail = "starting…";
 
 		try {
 			seedSandbox(sandboxDir, skillDir, entry.evalCase.files);
 			const id = taskId(entry);
+			const updateDetail = (detail: string) => {
+				lastDetail = detail;
+				spinner.detail(id, detail);
+			};
 
 			return await withTimeout(
 				(async () => {
@@ -195,18 +201,20 @@ export async function runOrchestrator(
 						toolHandlers: createToolHandlers(sandboxDir, config.settings.timeout),
 						maxSteps: config.settings.maxSteps,
 						temperature: config.settings.temperature,
-						onActivity: (detail) => spinner.detail(id, detail),
+						onActivity: updateDetail,
 						checkTurnRelevance: turns.length > 1 ? createTurnChecker(graderProvider) : undefined,
 					});
 
 					const outputFiles = collectOutputFiles(sandboxDir);
 
-					spinner.detail(id, "grading…");
-					const grading: GradingResult = await gradeRun(
-						graderProvider,
-						entry.evalCase,
-						agentRun,
-						outputFiles,
+					updateDetail("grading…");
+					const grading: GradingResult = await withHeartbeat(
+						gradeRun(graderProvider, entry.evalCase, agentRun, outputFiles),
+						{
+							intervalMs: PHASE_HEARTBEAT_MS,
+							onHeartbeat: (elapsedMs) =>
+								updateDetail(`grading… waiting ${Math.floor(elapsedMs / 1000)}s`),
+						},
 					);
 
 					const cost = estimateCost(
@@ -240,7 +248,7 @@ export async function runOrchestrator(
 					};
 				})(),
 				evalTimeoutMs,
-				`Eval timed out after ${config.settings.timeout}s`,
+				() => `${taskLabel(entry)} — ${lastDetail}`,
 			);
 		} finally {
 			fs.rmSync(sandboxDir, { recursive: true, force: true });

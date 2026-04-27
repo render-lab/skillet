@@ -15,6 +15,9 @@ import {
 } from "../utils/cli-error.js";
 import { extractErrorMessage } from "../utils/error.js";
 import { VERSION } from "../version.js";
+import { extractSkillVersion } from "../../schemas/skill.js";
+import { parseFrontmatter } from "../../utils/frontmatter.js";
+import { hashString } from "../../utils/hash.js";
 import { compareBenchmarks, printComparison } from "./compare.js";
 
 export interface RunOpts {
@@ -39,6 +42,14 @@ ${skillContent}
 </skill_instructions>
 
 Use the available tools (bash, read_file, write_file, list_directory) to complete the task. Work step by step.`;
+}
+
+function resolveSkillRunMetadata(skillContent: string) {
+	const { frontmatter } = parseFrontmatter(skillContent);
+	return {
+		skillVersion: extractSkillVersion(frontmatter) ?? "unversioned",
+		skillSha256: hashString(skillContent),
+	};
 }
 
 export async function runRun(opts: RunOpts) {
@@ -124,6 +135,7 @@ async function runSingleSkill(
 	}
 
 	const skillContent = fs.readFileSync(paths.skillFile, "utf-8");
+	const skillMeta = resolveSkillRunMetadata(skillContent);
 	const systemPrompt = buildSystemPrompt(skillContent);
 
 	const rawEvals = JSON.parse(fs.readFileSync(paths.evalsFile, "utf-8"));
@@ -147,14 +159,14 @@ async function runSingleSkill(
 		}
 	}
 
-	printRunHeader(opts, paths, evals, config);
+	printRunHeader(opts, paths, evals, config, skillMeta);
 
 	const result = await runOrchestrator(config, evals, paths.skillDir, systemPrompt, {
 		concurrency: opts.concurrency ? Number(opts.concurrency) : undefined,
 	});
 
 	printResults(result, evals, config.providers.length);
-	writeOutputs(result, config, evalsFile, evals, { ...opts, skill: opts.skill }, paths);
+	writeOutputs(result, config, evalsFile, evals, { ...opts, skill: opts.skill }, paths, skillMeta);
 
 	if (opts.golden) {
 		if (!fs.existsSync(opts.golden)) {
@@ -167,7 +179,20 @@ async function runSingleSkill(
 		const goldenRaw = JSON.parse(fs.readFileSync(opts.golden, "utf-8"));
 		const golden = BenchmarkFileSchema.parse(goldenRaw);
 		const results = compareBenchmarks(golden.provider_summary, result.providerSummary);
-		const failed = printComparison(results, opts.golden);
+		const failed = printComparison(results, opts.golden, {
+			goldenMetadata: golden.metadata,
+			currentMetadata: {
+				skill_name: evalsFile.skill_name,
+				skill_path: opts.skill,
+				skill_version: skillMeta.skillVersion,
+				skill_sha256: skillMeta.skillSha256,
+				timestamp: "",
+				evals_run: evals.map((e) => e.id),
+				runs_per_provider: config.settings.runsPerProvider,
+				providers: config.providers.map((p) => ({ name: p.name, model: p.model })),
+				grader: { name: config.grader.provider, model: config.grader.model },
+			},
+		});
 		if (failed) {
 			throw new Error(pc.red(`Regression check failed for ${opts.skill}`));
 		}
@@ -184,6 +209,7 @@ function printRunHeader(
 	paths: ReturnType<typeof resolveSkillPaths>,
 	evals: EvalCase[],
 	config: ReturnType<typeof loadConfig>,
+	skillMeta: ReturnType<typeof resolveSkillRunMetadata>,
 ) {
 	console.log(pc.bold(`\n  skillet eval v${VERSION}\n`));
 	const overall = (opts as RunOpts & { overall?: { skillIndex: number; skillTotal: number } }).overall;
@@ -202,6 +228,7 @@ function printRunHeader(
 	}
 	console.log(`  Runs:      ${config.settings.runsPerProvider} per provider`);
 	console.log(`  Grader:    ${config.grader.model}`);
+	console.log(`  Version:   ${skillMeta.skillVersion} ${pc.dim(`(${skillMeta.skillSha256.slice(0, 8)})`)}`);
 	console.log("");
 }
 
@@ -212,6 +239,7 @@ function writeOutputs(
 	evals: { id: number }[],
 	opts: RunOpts & { skill: string },
 	paths: ReturnType<typeof resolveSkillPaths>,
+	skillMeta: ReturnType<typeof resolveSkillRunMetadata>,
 ) {
 	const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 	const resultsDir = paths.resultsDir;
@@ -220,6 +248,8 @@ function writeOutputs(
 	const meta = {
 		skillName: evalsFile.skill_name,
 		skillPath: opts.skill,
+		skillVersion: skillMeta.skillVersion,
+		skillSha256: skillMeta.skillSha256,
 		evalsRun: evals.map((e) => e.id),
 	};
 

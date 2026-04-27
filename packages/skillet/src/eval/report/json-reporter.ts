@@ -9,6 +9,8 @@ export function writeBenchmarkJson(
 	meta: {
 		skillName: string;
 		skillPath: string;
+		skillVersion: string;
+		skillSha256: string;
 		evalsRun: number[];
 	},
 	outputPath: string,
@@ -17,6 +19,8 @@ export function writeBenchmarkJson(
 		metadata: {
 			skill_name: meta.skillName,
 			skill_path: meta.skillPath,
+			skill_version: meta.skillVersion,
+			skill_sha256: meta.skillSha256,
 			timestamp: new Date().toISOString(),
 			evals_run: meta.evalsRun,
 			runs_per_provider: config.settings.runsPerProvider,
