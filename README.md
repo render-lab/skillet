@@ -1,6 +1,6 @@
 # Skillet
 
-![Cooking up tasty skills!](assets/skillet.png)
+<img src="assets/skillet.png" alt="Cooking up tasty skills!" width="320">
 *Cooking up tasty skills!*
 
 > [!IMPORTANT]
