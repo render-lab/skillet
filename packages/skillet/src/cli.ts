@@ -36,9 +36,16 @@ async function runEvalCommand(command: () => void | Promise<void>) {
 	}
 }
 
-function loadEnvForSkill(skill?: string) {
+function normalizeSkills(skills?: string[]) {
+	return skills && skills.length > 0 ? skills : ["."];
+}
+
+function loadEnvForSkills(skills?: string[]) {
+	const normalizedSkills = normalizeSkills(skills);
 	const dirs = [process.cwd()];
-	if (skill) dirs.push(path.resolve(skill));
+	for (const skill of normalizedSkills) {
+		dirs.push(path.resolve(skill));
+	}
 	loadDotenv(dirs);
 }
 
@@ -102,7 +109,7 @@ evalProgram
 	.action((skill, opts) =>
 		runEvalCommand(() => {
 			const resolvedSkill = skill ?? ".";
-			loadEnvForSkill(resolvedSkill);
+			loadEnvForSkills([resolvedSkill]);
 			return runGenerate({ ...opts, skill: resolvedSkill });
 		}),
 	);
@@ -115,7 +122,7 @@ evalProgram
 	.action((skill, opts) =>
 		runEvalCommand(async () => {
 			const resolvedSkill = skill ?? ".";
-			loadEnvForSkill(resolvedSkill);
+			loadEnvForSkills([resolvedSkill]);
 			await runFixtures({ ...opts, skill: resolvedSkill });
 		}),
 	);
@@ -128,21 +135,21 @@ evalProgram
 	.action((skill, opts) =>
 		runEvalCommand(async () => {
 			const resolvedSkill = skill ?? ".";
-			loadEnvForSkill(resolvedSkill);
+			loadEnvForSkills([resolvedSkill]);
 			await runScaffold({ ...opts, skill: resolvedSkill });
 		}),
 	);
 
 evalProgram
-	.command("validate [skill]")
-	.description("Pre-flight checks: verify skill directory, evals, and API keys")
+	.command("validate [skills...]")
+	.description("Pre-flight checks for one or more skills: verify directories, evals, and API keys")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill, opts) =>
+	.action((skills, opts) =>
 		runEvalCommand(() => {
-			const resolvedSkill = skill ?? ".";
-			loadEnvForSkill(resolvedSkill);
-			return runValidate({ ...opts, skill: resolvedSkill });
+			const resolvedSkills = normalizeSkills(skills);
+			loadEnvForSkills(resolvedSkills);
+			return runValidate({ ...opts, skills: resolvedSkills });
 		}),
 	);
 
@@ -154,14 +161,14 @@ evalProgram
 	.action((skill, opts) =>
 		runEvalCommand(() => {
 			const resolvedSkill = skill ?? ".";
-			loadEnvForSkill(resolvedSkill);
+			loadEnvForSkills([resolvedSkill]);
 			return runServe({ ...opts, skill: resolvedSkill });
 		}),
 	);
 
 evalProgram
-	.command("run [skill]")
-	.description("Run evals across configured providers")
+	.command("run [skills...]")
+	.description("Run evals across configured providers for one or more skills")
 	.option("--evals <path>", "Path to evals.json (default: <skill>/evals.json)")
 	.option("--config <path>", "Path to skillet.eval.yaml")
 	.option("--eval-id <ids>", "Comma-separated eval IDs to run")
@@ -172,11 +179,11 @@ evalProgram
 	.option("--timeout <seconds>", "Timeout per eval in seconds", "300")
 	.option("--concurrency <n>", "Max concurrent eval runs (default: all, max 10)")
 	.option("--golden <path>", "Golden benchmark file to compare against for regression")
-	.action((skill, opts) =>
+	.action((skills, opts) =>
 		runEvalCommand(async () => {
-			const resolvedSkill = skill ?? ".";
-			loadEnvForSkill(resolvedSkill);
-			await runRun({ ...opts, skill: resolvedSkill });
+			const resolvedSkills = normalizeSkills(skills);
+			loadEnvForSkills(resolvedSkills);
+			await runRun({ ...opts, skills: resolvedSkills });
 		}),
 	);
 

@@ -9,15 +9,16 @@ import { runOrchestrator } from "../runner/orchestrator.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { type EvalCase, EvalsFileSchema, getTurns } from "../schemas/evals.js";
 import {
-	exitWithMissingEvalsFile,
+	formatMissingEvalsFileMessage,
+	formatMissingSkillFileMessage,
 	exitWithMissingFile,
-	exitWithMissingSkillFile,
 } from "../utils/cli-error.js";
+import { extractErrorMessage } from "../utils/error.js";
 import { VERSION } from "../version.js";
 import { compareBenchmarks, printComparison } from "./compare.js";
 
 export interface RunOpts {
-	skill: string;
+	skills: string[];
 	evals?: string;
 	config?: string;
 	evalId?: string;
@@ -41,14 +42,52 @@ Use the available tools (bash, read_file, write_file, list_directory) to complet
 }
 
 export async function runRun(opts: RunOpts) {
+	const multipleSkills = opts.skills.length > 1;
+	let hadError = false;
+
+	if (multipleSkills && opts.evals) {
+		throw new Error("--evals can only be used when running a single skill.");
+	}
+	if (multipleSkills && opts.golden) {
+		throw new Error("--golden can only be used when running a single skill.");
+	}
+
+	for (const [index, skill] of opts.skills.entries()) {
+		if (multipleSkills && index > 0) {
+			console.log("");
+		}
+
+		if (multipleSkills) {
+			console.log(pc.bold(`Skill: ${skill}`));
+		}
+
+		try {
+			await runSingleSkill({ ...opts, skill });
+		} catch (err) {
+			hadError = true;
+			console.error(extractErrorMessage(err));
+		}
+	}
+
+	if (hadError) {
+		if (multipleSkills) {
+			console.error(pc.red("\nOne or more skill eval runs failed.\n"));
+		}
+		process.exit(1);
+	}
+}
+
+async function runSingleSkill(opts: RunOpts & { skill: string }) {
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
 	const skillArg = opts.skill || ".";
 
 	if (!fs.existsSync(paths.skillFile)) {
-		exitWithMissingSkillFile("run", skillArg, paths.skillFile);
+		throw new Error(formatMissingSkillFileMessage("run", skillArg, paths.skillFile));
 	}
 	if (!fs.existsSync(paths.evalsFile)) {
-		exitWithMissingEvalsFile("run", skillArg, paths.evalsFile, Boolean(opts.evals));
+		throw new Error(
+			formatMissingEvalsFileMessage("run", skillArg, paths.evalsFile, Boolean(opts.evals)),
+		);
 	}
 
 	const skillContent = fs.readFileSync(paths.skillFile, "utf-8");
@@ -71,8 +110,7 @@ export async function runRun(opts: RunOpts) {
 		const ids = opts.evalId.split(",").map(Number);
 		evals = evals.filter((e) => ids.includes(e.id));
 		if (evals.length === 0) {
-			console.error(pc.red(`No evals found with IDs: ${opts.evalId}`));
-			process.exit(1);
+			throw new Error(pc.red(`No evals found with IDs: ${opts.evalId}`));
 		}
 	}
 
@@ -83,7 +121,7 @@ export async function runRun(opts: RunOpts) {
 	});
 
 	printResults(result, evals, config.providers.length);
-	writeOutputs(result, config, evalsFile, evals, opts, paths);
+	writeOutputs(result, config, evalsFile, evals, { ...opts, skill: opts.skill }, paths);
 
 	if (opts.golden) {
 		if (!fs.existsSync(opts.golden)) {
@@ -97,7 +135,9 @@ export async function runRun(opts: RunOpts) {
 		const golden = BenchmarkFileSchema.parse(goldenRaw);
 		const results = compareBenchmarks(golden.provider_summary, result.providerSummary);
 		const failed = printComparison(results, opts.golden);
-		if (failed) process.exit(1);
+		if (failed) {
+			throw new Error(pc.red(`Regression check failed for ${opts.skill}`));
+		}
 	}
 }
 
@@ -128,7 +168,7 @@ function writeOutputs(
 	config: ReturnType<typeof loadConfig>,
 	evalsFile: { skill_name: string },
 	evals: { id: number }[],
-	opts: RunOpts,
+	opts: RunOpts & { skill: string },
 	paths: ReturnType<typeof resolveSkillPaths>,
 ) {
 	const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);

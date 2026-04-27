@@ -137,6 +137,8 @@ skillet eval init
 skillet eval generate ./my-skill
 skillet eval validate ./my-skill
 skillet eval run ./my-skill
+skillet eval validate ./skill-a ./skill-b
+skillet eval run ./skill-a ./skill-b
 skillet eval serve ./my-skill
 ```
 
