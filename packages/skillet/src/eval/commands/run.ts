@@ -46,6 +46,10 @@ export async function runRun(opts: RunOpts) {
 	const skills = resolveSkillSelection(opts.skills, discoveryConfig.skillRoots);
 	const multipleSkills = skills.length > 1;
 	let hadError = false;
+	let succeededSkills = 0;
+	let failedSkills = 0;
+	let totalEvalCases = 0;
+	let totalEvalRuns = 0;
 
 	if (multipleSkills && opts.evals) {
 		throw new Error("--evals can only be used when running a single skill.");
@@ -54,21 +58,46 @@ export async function runRun(opts: RunOpts) {
 		throw new Error("--golden can only be used when running a single skill.");
 	}
 
+	if (multipleSkills) {
+		console.log(pc.bold("\nMulti-skill eval run\n"));
+		console.log(`  Skills:    ${skills.length}`);
+		console.log(`  Scope:     all selected skills`);
+		console.log("");
+	}
+
 	for (const [index, skill] of skills.entries()) {
 		if (multipleSkills && index > 0) {
 			console.log("");
 		}
 
 		if (multipleSkills) {
-			console.log(pc.bold(`Skill: ${skill}`));
+			console.log(pc.bold(`[${index + 1}/${skills.length}] Skill: ${skill}`));
 		}
 
 		try {
-			await runSingleSkill({ ...opts, skill });
+			const summary = await runSingleSkill({
+				...opts,
+				skill,
+				overall: { skillIndex: index + 1, skillTotal: skills.length },
+			});
+			succeededSkills++;
+			totalEvalCases += summary.evalCount;
+			totalEvalRuns += summary.totalRunCount;
 		} catch (err) {
 			hadError = true;
+			failedSkills++;
 			console.error(extractErrorMessage(err));
 		}
+	}
+
+	if (multipleSkills) {
+		console.log(pc.bold("\nMulti-skill summary\n"));
+		console.log(`  Skills:     ${skills.length} total`);
+		console.log(`  Succeeded:  ${succeededSkills}`);
+		console.log(`  Failed:     ${failedSkills}`);
+		console.log(`  Evals:      ${totalEvalCases} across successful skills`);
+		console.log(`  Runs:       ${totalEvalRuns} total eval run(s)`);
+		console.log("");
 	}
 
 	if (hadError) {
@@ -79,7 +108,9 @@ export async function runRun(opts: RunOpts) {
 	}
 }
 
-async function runSingleSkill(opts: RunOpts & { skill: string }) {
+async function runSingleSkill(
+	opts: RunOpts & { skill: string; overall?: { skillIndex: number; skillTotal: number } },
+) {
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
 	const skillArg = opts.skill || ".";
 
@@ -141,6 +172,11 @@ async function runSingleSkill(opts: RunOpts & { skill: string }) {
 			throw new Error(pc.red(`Regression check failed for ${opts.skill}`));
 		}
 	}
+
+	return {
+		evalCount: evals.length,
+		totalRunCount: evals.length * config.providers.length * config.settings.runsPerProvider,
+	};
 }
 
 function printRunHeader(
@@ -150,6 +186,10 @@ function printRunHeader(
 	config: ReturnType<typeof loadConfig>,
 ) {
 	console.log(pc.bold(`\n  skillet eval v${VERSION}\n`));
+	const overall = (opts as RunOpts & { overall?: { skillIndex: number; skillTotal: number } }).overall;
+	if (overall) {
+		console.log(`  Progress:  skill ${overall.skillIndex} of ${overall.skillTotal}`);
+	}
 	console.log(`  Skill:     ${paths.skillDir}`);
 	console.log(`  Evals:     ${evals.length} eval(s)`);
 	console.log(`  Providers:  ${config.providers.map((p) => p.model).join(", ")}`);

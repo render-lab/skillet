@@ -123,8 +123,9 @@ describe("multi-skill eval commands", () => {
 
 		expect(exitSpy).toHaveBeenCalledWith(1);
 		const logs = vi.mocked(console.log).mock.calls.flat().join("\n");
-		expect(logs).toContain(`Skill: ${skillA}`);
-		expect(logs).toContain(`Skill: ${skillB}`);
+		expect(logs).toContain("Validating 2 skill(s)");
+		expect(logs).toContain(`[1/2] Skill: ${skillA}`);
+		expect(logs).toContain(`[2/2] Skill: ${skillB}`);
 		expect(logs).toContain("evals.json valid");
 		expect(logs).toContain("evals.json not found");
 	});
@@ -142,6 +143,17 @@ describe("multi-skill eval commands", () => {
 		expect(runOrchestratorMock).toHaveBeenCalledTimes(2);
 		expect(runOrchestratorMock.mock.calls[0]?.[2]).toBe(skillA);
 		expect(runOrchestratorMock.mock.calls[1]?.[2]).toBe(skillB);
+		const logs = vi.mocked(console.log).mock.calls.flat().join("\n");
+		expect(logs).toContain("Multi-skill eval run");
+		expect(logs).toContain("Skills:    2");
+		expect(logs).toContain(`[1/2] Skill: ${skillA}`);
+		expect(logs).toContain(`[2/2] Skill: ${skillB}`);
+		expect(logs).toContain("Multi-skill summary");
+		expect(logs).toContain("Skills:     2 total");
+		expect(logs).toContain("Succeeded:  2");
+		expect(logs).toContain("Failed:     0");
+		expect(logs).toContain("Evals:      2 across successful skills");
+		expect(logs).toContain("Runs:       2 total eval run(s)");
 
 		const resultDirs = await readdir(path.join(tmpDir, ".skillet-evals", "results"));
 		expect(resultDirs.sort()).toEqual(["skill-a", "skill-b"]);

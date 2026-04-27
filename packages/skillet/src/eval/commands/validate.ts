@@ -29,11 +29,14 @@ export async function runValidate(opts: ValidateOpts) {
 	}
 
 	console.log(pc.bold("\nSkill Eval — Validate\n"));
+	if (multipleSkills) {
+		console.log(`Validating ${skills.length} skill(s)\n`);
+	}
 
 	for (const [index, skill] of skills.entries()) {
 		if (multipleSkills) {
 			if (index > 0) console.log("");
-			console.log(pc.bold(`Skill: ${skill}`));
+			console.log(pc.bold(`[${index + 1}/${skills.length}] Skill: ${skill}`));
 		}
 
 		const paths = resolveSkillPaths(skill, opts.evals);

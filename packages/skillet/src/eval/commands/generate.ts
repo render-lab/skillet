@@ -183,6 +183,9 @@ export async function runGenerate(opts: GenerateOpts) {
 	prompts.log.info(`Generator: ${pc.bold(provider.modelId)}`);
 	prompts.log.info(`Models: ${pc.bold(models.join(", "))}`);
 	prompts.log.info(`Count: ${pc.bold(String(finalCount))} eval(s)`);
+	if (skills.length > 1) {
+		prompts.log.info(`Skills: ${pc.bold(String(skills.length))} total`);
+	}
 
 	for (const [index, skill] of skills.entries()) {
 		if (index > 0) console.log("");
@@ -191,6 +194,7 @@ export async function runGenerate(opts: GenerateOpts) {
 			models,
 			count: finalCount,
 			provider,
+			progress: { index: index + 1, total: skills.length },
 		});
 	}
 
@@ -202,6 +206,7 @@ async function runGenerateForSkill(opts: {
 	models: string[];
 	count: number;
 	provider: ReturnType<typeof createProvider>;
+	progress: { index: number; total: number };
 }) {
 	const paths = resolveSkillPaths(opts.skill);
 	const skillArg = opts.skill || ".";
@@ -210,6 +215,43 @@ async function runGenerateForSkill(opts: {
 		exitWithMissingSkillFile("generate", skillArg, paths.skillFile);
 	}
 
+	const outputPath = path.join(paths.skillDir, "evals.json");
+	let writePath = outputPath;
+	if (fs.existsSync(outputPath)) {
+		const action = exitIfCancelled(
+			await prompts.select({
+				message: `${outputPath} already exists. What would you like to do?`,
+				options: [
+					{ value: "overwrite", label: "Overwrite evals.json" },
+					{
+						value: "generated",
+						label: "Write to evals.generated.json",
+						hint: "keeps the existing evals.json",
+					},
+					{
+						value: "skip",
+						label: "Skip this skill",
+						hint: "do not generate anything",
+					},
+				],
+				initialValue: "generated",
+			}),
+		) as "overwrite" | "generated" | "skip";
+
+		if (action === "skip") {
+			prompts.log.info(`Skipped ${pc.bold(paths.skillDir)}`);
+			return;
+		}
+		if (action === "generated") {
+			writePath = path.join(paths.skillDir, "evals.generated.json");
+		}
+	}
+
+	if (opts.progress.total > 1) {
+		prompts.log.info(
+			`Progress: ${pc.bold(`skill ${opts.progress.index} of ${opts.progress.total}`)}`,
+		);
+	}
 	prompts.log.info(`Skill: ${pc.bold(paths.skillDir)}`);
 	prompts.log.info(`Generator: ${pc.bold(opts.provider.modelId)}`);
 	prompts.log.info(`Models: ${pc.bold(opts.models.join(", "))}`);
@@ -289,18 +331,6 @@ async function runGenerateForSkill(opts: {
 
 	// Ensure the selected models are in the output
 	evalsFile.models = opts.models;
-
-	const outputPath = path.join(paths.skillDir, "evals.json");
-	let writePath = outputPath;
-
-	if (fs.existsSync(outputPath)) {
-		const overwrite = exitIfCancelled(
-			await prompts.confirm({ message: `${outputPath} already exists. Overwrite?` }),
-		);
-		if (!overwrite) {
-			writePath = path.join(paths.skillDir, "evals.generated.json");
-		}
-	}
 
 	fs.writeFileSync(writePath, `${JSON.stringify(evalsFile, null, 2)}\n`);
 	prompts.log.success(`Wrote ${writePath}`);

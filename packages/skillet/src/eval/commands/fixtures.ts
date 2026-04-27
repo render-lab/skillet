@@ -77,9 +77,17 @@ export async function runFixtures(opts: FixturesOpts) {
 	prompts.intro(pc.bold("skillet eval fixtures"));
 
 	const provider = createProvider(config.providers[0]);
+	if (skills.length > 1) {
+		prompts.log.info(`Skills: ${pc.bold(String(skills.length))} total`);
+	}
 	for (const [index, skill] of skills.entries()) {
 		if (index > 0) console.log("");
-		await runFixturesForSkill({ skill, evals: opts.evals, provider });
+		await runFixturesForSkill({
+			skill,
+			evals: opts.evals,
+			provider,
+			progress: { index: index + 1, total: skills.length },
+		});
 	}
 
 	prompts.outro(`${skills.length} skill(s) processed`);
@@ -89,6 +97,7 @@ async function runFixturesForSkill(opts: {
 	skill: string;
 	evals?: string;
 	provider: ReturnType<typeof createProvider>;
+	progress: { index: number; total: number };
 }) {
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
 	const skillArg = opts.skill || ".";
@@ -109,6 +118,11 @@ async function runFixturesForSkill(opts: {
 		return;
 	}
 
+	if (opts.progress.total > 1) {
+		prompts.log.info(
+			`Progress: ${pc.bold(`skill ${opts.progress.index} of ${opts.progress.total}`)}`,
+		);
+	}
 	prompts.log.info(`Skill: ${pc.bold(paths.skillDir)}`);
 	const existing = filePaths.filter((f) => fs.existsSync(path.join(paths.skillDir, f)));
 	if (existing.length > 0) {
