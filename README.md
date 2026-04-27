@@ -1,7 +1,8 @@
 # Skillet
 
-<img src="assets/skillet.png" alt="Cooking up tasty skills!" width="320">
-*Cooking up tasty skills!*
+<img src="assets/skillet.png" alt="Cooking up tasty skills!" width="240">
+
+*Cooking up tasty skills for your agents*
 
 > [!IMPORTANT]
 > **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
