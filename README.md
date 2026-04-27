@@ -1,22 +1,24 @@
 # Skillet
 
-<img src="assets/skillet.png" alt="Cooking up tasty skills!" width="240">
+<img src="assets/skillet.png" alt="Keep your agent skills fresh and tasty" width="240">
 
-*Cooking up tasty skills for your agents*
+*Keep your agent skills fresh and tasty*
 
 > [!IMPORTANT]
 > **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
 
-Toolkit for AI agent skills: dependency management, runtime context emission, and cross-provider evaluation.
+Skillet helps you manage AI agent skills with reproducible installs, runtime-specific context emission, and built-in evals.
 
-AI agents work best when given explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, emit runtime-specific context, and benchmark how well a model actually follows those instructions.
+AI agents work best when you give them explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, emit runtime-specific context, and benchmark how well a model follows those instructions.
 
 ## One CLI, two workflows
 
-Skillet now exposes a single CLI:
+Skillet exposes a single CLI:
 
 - `skillet ...` for package-management workflows
 - `skillet eval ...` for evaluation workflows
+
+Use `skillet` when you want to install and emit skills for an agent runtime. Use `skillet eval` when you want to generate eval cases, validate a skill, and measure how well a model follows it.
 
 ## How skills work
 
@@ -67,7 +69,7 @@ Each entry in `skills` maps a GitHub skill path to a version range. The `config`
 
 ```bash
 skillet init
-skillet add owner/repo/skill@^1.0
+skillet add owner/repo/skills/my-skill@^1.0
 skillet install
 skillet emit --target cursor
 skillet update
@@ -135,6 +137,8 @@ Evals support single prompts and multi-turn conversations via a `turns` array.
 ```bash
 skillet eval init
 skillet eval generate ./my-skill
+skillet eval fixtures ./my-skill
+skillet eval scaffold ./my-skill
 skillet eval validate ./my-skill
 skillet eval run ./my-skill
 skillet eval validate ./skill-a ./skill-b
@@ -146,21 +150,15 @@ skillet eval serve ./my-skill
 
 The TypeScript implementation lives in `packages/skillet/`, with eval internals under `src/eval/`. A Python reference implementation lives in `packages/skillet-eval-python/`.
 
-## Comparison with Vercel `npx skills`
+### Typical eval flow
 
-Vercel's [`npx skills`](https://github.com/vercel-labs/skills) is a popular tool in the same space. Both projects solve the same core problem: managing reusable context for AI agents. They make different trade-offs:
-
-| Aspect | `skillet` | Vercel `npx skills` |
-| --- | --- | --- |
-| Dependency model | Declarative manifest with version ranges | Imperative add/remove |
-| Lockfile | SHA256 content-hash pinning | In progress (global/project lock split) |
-| Injection control | Eager, lazy, and tiered strategies | N/A |
-| Evaluation | Built-in cross-provider benchmarking | N/A |
-| Discovery | N/A | Public catalog at skills.sh |
-| Agent support | 7 targets | 40+ agents |
-| Onboarding | Requires `init` and a manifest | Zero-config `npx` |
-
-Skillet prioritizes reproducibility and eval-gated quality. Vercel's tool prioritizes breadth and zero-friction onboarding. They're complementary rather than competing.
+```bash
+skillet eval init
+skillet eval scaffold ./my-skill
+skillet eval validate ./my-skill
+skillet eval run ./my-skill
+skillet eval serve ./my-skill
+```
 
 ## Project structure
 
@@ -177,7 +175,24 @@ skillet/
 └── skills.lock                # Pinned skill versions
 ```
 
-## Quick start
+## Using skillet in a project
+
+If you want to manage skills in your own project, start with:
+
+```bash
+skillet init
+skillet add R4ph-t/opinionated-vibe-coding/skills/ovc-audit@2.0
+skillet install
+skillet emit --target cursor
+```
+
+If you want to try the eval engine on a fixture skill, run:
+
+```bash
+skillet eval run fixtures/skills/code-review
+```
+
+## Developing this repo
 
 Prerequisites: Node.js 20+, [pnpm](https://pnpm.io/)
 
@@ -189,21 +204,6 @@ pnpm install && pnpm build
 pnpm test
 pnpm typecheck
 pnpm check
-```
-
-Try the eval engine on a fixture skill:
-
-```bash
-skillet eval run fixtures/skills/code-review
-```
-
-Or manage skills in your own project:
-
-```bash
-skillet init
-skillet add R4ph-t/opinionated-vibe-coding/skills/ovc-audit@2.0
-skillet install
-skillet emit --target cursor
 ```
 
 ## License
