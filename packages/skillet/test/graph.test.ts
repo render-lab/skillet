@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGraph, type ResolvedSkill } from "../src/resolver/graph.js";
+import { type ResolvedSkill, buildGraph } from "../src/resolver/graph.js";
 
 function makeSkill(id: string, version = "1.0.0", sha = "abc"): ResolvedSkill {
 	return {

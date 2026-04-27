@@ -1,10 +1,10 @@
 {
-  "lockfileVersion": 1,
-  "resolved": {
-    "test-org/test-repo/sample-skill@1.0.0": {
-      "sha256": "abc123def456",
-      "source": "https://github.com/test-org/test-repo/tree/main/sample-skill",
-      "commitSha": "deadbeef"
-    }
-  }
+	"lockfileVersion": 1,
+	"resolved": {
+		"test-org/test-repo/sample-skill@1.0.0": {
+			"sha256": "abc123def456",
+			"source": "https://github.com/test-org/test-repo/tree/main/sample-skill",
+			"commitSha": "deadbeef"
+		}
+	}
 }

@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
 import { PROVIDER_REGISTRY, loadConfig, resolveSkillPaths } from "../config.js";
-import { compareBenchmarks, printComparison } from "./compare.js";
 import { printResults } from "../report/console-reporter.js";
 import { writeDashboard } from "../report/html-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
@@ -15,6 +14,7 @@ import {
 	exitWithMissingSkillFile,
 } from "../utils/cli-error.js";
 import { VERSION } from "../version.js";
+import { compareBenchmarks, printComparison } from "./compare.js";
 
 export interface RunOpts {
 	skill: string;

@@ -29,10 +29,7 @@ export class CursorEmitter implements Emitter {
 	}
 }
 
-function buildMdcFile(
-	skill: SkillContent,
-	strategy: EmitContext["strategy"],
-): string {
+function buildMdcFile(skill: SkillContent, strategy: EmitContext["strategy"]): string {
 	const body = renderSkill(skill, strategy);
 	const frontmatter = [
 		"---",

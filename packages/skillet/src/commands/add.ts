@@ -1,15 +1,20 @@
 import path from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { MANIFEST_FILE, ManifestSchema } from "../schemas/manifest.js";
-import { formatSkillId, parseSkillSpec } from "../schemas/skill.js";
-import { resolveSkillOrDiscover } from "../resolver/github.js";
-import type { ResolvedSkill } from "../resolver/graph.js";
-import { buildGraph } from "../resolver/graph.js";
+import {
+	getLockedSkillEntry,
+	getLockedSkillSha,
+	makeResolvedSkillFromLockEntry,
+} from "../lockfile/entries.js";
 import { readLockfile } from "../lockfile/read.js";
 import { buildLockfile, writeLockfile } from "../lockfile/write.js";
-import { fileExists, readJson, writeJson } from "../utils/fs.js";
+import { resolveSkillOrDiscover } from "../resolver/github.js";
+import { buildGraph } from "../resolver/graph.js";
+import type { ResolvedSkill } from "../resolver/graph.js";
+import { MANIFEST_FILE, ManifestSchema } from "../schemas/manifest.js";
+import { formatSkillId, parseSkillSpec } from "../schemas/skill.js";
 import { exitWithMissingManifest } from "../utils/cli-error.js";
+import { fileExists, readJson, writeJson } from "../utils/fs.js";
 import { GitError } from "../utils/git.js";
 
 interface AddOptions {
@@ -33,7 +38,7 @@ export async function runAdd(opts: AddOptions) {
 	let failed = 0;
 
 	for (const spec of opts.specs) {
-		let parsed;
+		let parsed: ReturnType<typeof parseSkillSpec>;
 		try {
 			parsed = parseSkillSpec(spec);
 		} catch {
@@ -49,7 +54,7 @@ export async function runAdd(opts: AddOptions) {
 		const id = formatSkillId(parsed);
 		console.log(pc.gray(`Resolving ${id}@${parsed.versionRange}...`));
 
-		const lockSha = existingLock ? findLockfileSha(existingLock, id) : undefined;
+		const lockSha = existingLock ? getLockedSkillSha(existingLock, id) : undefined;
 
 		try {
 			const result = await resolveSkillOrDiscover(parsed, { lockfileSha: lockSha });
@@ -63,9 +68,7 @@ export async function runAdd(opts: AddOptions) {
 					),
 				);
 			} else {
-				const selected = opts.all
-					? result.skills
-					: await promptSkillSelection(result.skills);
+				const selected = opts.all ? result.skills : await promptSkillSelection(result.skills);
 				if (selected.length === 0) {
 					console.log(pc.yellow("  No skills selected."));
 					continue;
@@ -73,9 +76,7 @@ export async function runAdd(opts: AddOptions) {
 				for (const skill of selected) {
 					resolved.push(skill);
 					manifest.skills[skill.id] = manifestVersion(parsed.versionRange, skill);
-					console.log(
-						pc.green(`  + ${skill.id}@${skill.version} (${skill.sha256.slice(0, 12)})`),
-					);
+					console.log(pc.green(`  + ${skill.id}@${skill.version} (${skill.sha256.slice(0, 12)})`));
 				}
 			}
 		} catch (err) {
@@ -96,18 +97,11 @@ export async function runAdd(opts: AddOptions) {
 
 		const allResolved = [...resolved];
 		if (existingLock) {
-			for (const [key, entry] of Object.entries(existingLock.resolved)) {
-				const id = key.split("@")[0];
-				if (!allResolved.some((r) => r.id === id)) {
-					allResolved.push({
-						spec: parseSkillSpec(id),
-						id,
-						version: key.split("@")[1] || "latest",
-						sha256: entry.sha256,
-						commitSha: entry.commitSha,
-						source: entry.source,
-						localPath: "",
-					});
+			for (const id of Object.keys(manifest.skills)) {
+				if (allResolved.some((r) => r.id === id)) continue;
+				const lockedSkill = getLockedSkillEntry(existingLock, id);
+				if (lockedSkill) {
+					allResolved.push(makeResolvedSkillFromLockEntry(id, lockedSkill.key, lockedSkill.entry));
 				}
 			}
 		}
@@ -119,7 +113,7 @@ export async function runAdd(opts: AddOptions) {
 	}
 
 	if (failed > 0 && resolved.length === 0) {
-		console.error(pc.red(`\nFailed to add any skills.`));
+		console.error(pc.red("\nFailed to add any skills."));
 		process.exit(1);
 	}
 
@@ -143,9 +137,7 @@ function manifestVersion(userRange: string, skill: ResolvedSkill): string {
 }
 
 async function promptSkillSelection(skills: ResolvedSkill[]): Promise<ResolvedSkill[]> {
-	console.log(
-		pc.cyan(`\n  Found ${skills.length} skills in this directory:\n`),
-	);
+	console.log(pc.cyan(`\n  Found ${skills.length} skills in this directory:\n`));
 
 	const ALL = "__all__";
 
@@ -171,14 +163,4 @@ async function promptSkillSelection(skills: ResolvedSkill[]): Promise<ResolvedSk
 		return skills;
 	}
 	return skills.filter((s) => selectedIds.has(s.id));
-}
-
-function findLockfileSha(
-	lockfile: { resolved: Record<string, { sha256: string }> },
-	id: string,
-): string | undefined {
-	for (const [key, entry] of Object.entries(lockfile.resolved)) {
-		if (key.startsWith(`${id}@`)) return entry.sha256;
-	}
-	return undefined;
 }

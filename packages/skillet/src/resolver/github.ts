@@ -64,7 +64,7 @@ export async function resolveSkill(
 	await mkdir(tmpDest, { recursive: true });
 
 	try {
-		const { commitSha } = await fetchFromGitHub(spec.owner, spec.repo, skillPath, ref, tmpDest);
+		const { commitSha } = await fetchFromGitHub(spec.owner, spec.repo, skillPath, tmpDest, ref);
 
 		const version = await readSkillVersion(tmpDest);
 		const sha256 = await hashDirectory(tmpDest);
@@ -129,7 +129,7 @@ export async function resolveSkillOrDiscover(
 	await mkdir(tmpDest, { recursive: true });
 
 	try {
-		const { commitSha } = await fetchFromGitHub(spec.owner, spec.repo, skillPath, ref, tmpDest);
+		const { commitSha } = await fetchFromGitHub(spec.owner, spec.repo, skillPath, tmpDest, ref);
 
 		if (await fileExists(path.join(tmpDest, "SKILL.md"))) {
 			const version = await readSkillVersion(tmpDest);

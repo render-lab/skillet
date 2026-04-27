@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EmitContext, SkillContent } from "../src/emitter/base.js";
 import { assembleMarkdown, renderEager, renderLazy, renderSkill } from "../src/emitter/base.js";
 import { ClaudeCodeEmitter } from "../src/emitter/claude-code.js";
-import { CursorEmitter, CursorLegacyEmitter } from "../src/emitter/cursor.js";
 import { CodexEmitter } from "../src/emitter/codex.js";
+import { CursorEmitter, CursorLegacyEmitter } from "../src/emitter/cursor.js";
 import { GenericEmitter } from "../src/emitter/generic.js";
 
 const SAMPLE_SKILL: SkillContent = {

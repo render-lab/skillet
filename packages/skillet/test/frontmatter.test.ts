@@ -3,7 +3,7 @@ import { parseFrontmatter, renderFrontmatter } from "../src/utils/frontmatter.js
 
 describe("parseFrontmatter", () => {
 	it("parses YAML frontmatter and body", () => {
-		const input = `---\nname: test\ndescription: A test\n---\n# Body\n\nContent here.`;
+		const input = "---\nname: test\ndescription: A test\n---\n# Body\n\nContent here.";
 		const result = parseFrontmatter(input);
 		expect(result.frontmatter.name).toBe("test");
 		expect(result.frontmatter.description).toBe("A test");

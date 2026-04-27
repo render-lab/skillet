@@ -13,6 +13,7 @@ export const TargetRuntime = z.enum([
 	"generic",
 ]);
 export type TargetRuntime = z.infer<typeof TargetRuntime>;
+export const TARGET_RUNTIMES = TargetRuntime.options;
 
 export const SkillInjectOverride = z.enum(["eager", "lazy"]);
 
@@ -35,7 +36,6 @@ export const ManifestSchema = z.object({
 	name: z.string(),
 	version: z.string().default("1.0.0"),
 	skills: z.record(z.string(), SkillEntry).default({}),
-	rules: z.record(z.string(), SkillEntry).optional(),
 	config: ManifestConfig.default({}),
 });
 export type Manifest = z.infer<typeof ManifestSchema>;

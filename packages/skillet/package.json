@@ -1,62 +1,59 @@
 {
-  "name": "skillet",
-  "version": "0.1.1",
-  "description": "Toolkit for AI agent skills — package management, context emission, and evaluation",
-  "type": "module",
-  "author": "Render",
-  "license": "MIT",
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "bin": {
-    "skillet": "./dist/cli.cjs"
-  },
-  "scripts": {
-    "prepare": "npm run build",
-    "build": "tsup",
-    "dev": "tsx src/cli.ts",
-    "check": "biome check .",
-    "check:fix": "biome check --fix .",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "keywords": [
-    "agent",
-    "skills",
-    "eval",
-    "benchmark",
-    "package-manager",
-    "lockfile",
-    "cursor",
-    "claude-code",
-    "codex",
-    "windsurf",
-    "cline"
-  ],
-  "engines": {
-    "node": ">=20"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
-    "@clack/prompts": "^0.9.1",
-    "@google/genai": "^1.44.0",
-    "commander": "^14.0.3",
-    "jsonrepair": "^3.13.2",
-    "openai": "^6.27.0",
-    "picocolors": "^1.1.1",
-    "semver": "^7.7.1",
-    "yaml": "^2.4.5",
-    "zod": "^3.25.55"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@types/node": "^22.13.10",
-    "@types/semver": "^7.7.0",
-    "tsup": "^8.5.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.0.9"
-  }
+	"name": "skillet",
+	"version": "0.1.1",
+	"description": "Toolkit for AI agent skills — package management, context emission, and evaluation",
+	"type": "module",
+	"author": "Render",
+	"license": "MIT",
+	"files": ["dist", "README.md", "LICENSE"],
+	"bin": {
+		"skillet": "./dist/cli.cjs"
+	},
+	"scripts": {
+		"prepare": "npm run build",
+		"build": "tsup",
+		"dev": "tsx src/cli.ts",
+		"typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+		"check": "biome check .",
+		"check:fix": "biome check --fix .",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"keywords": [
+		"agent",
+		"skills",
+		"eval",
+		"benchmark",
+		"package-manager",
+		"lockfile",
+		"cursor",
+		"claude-code",
+		"codex",
+		"windsurf",
+		"cline"
+	],
+	"engines": {
+		"node": ">=20"
+	},
+	"dependencies": {
+		"@anthropic-ai/sdk": "^0.78.0",
+		"@clack/prompts": "^0.9.1",
+		"@google/genai": "^1.44.0",
+		"commander": "^14.0.3",
+		"jsonrepair": "^3.13.2",
+		"openai": "^6.27.0",
+		"picocolors": "^1.1.1",
+		"semver": "^7.7.1",
+		"yaml": "^2.4.5",
+		"zod": "^3.25.55"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/node": "^22.13.10",
+		"@types/semver": "^7.7.0",
+		"tsup": "^8.5.0",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.0.9"
+	}
 }

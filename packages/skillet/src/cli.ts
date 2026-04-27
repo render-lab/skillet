@@ -27,16 +27,22 @@ program.configureOutput({
 	outputError: (str, write) => write(pc.red(str)),
 });
 
+async function runEvalCommand(command: () => void | Promise<void>) {
+	try {
+		await command();
+	} catch (err) {
+		console.error(`Error: ${extractErrorMessage(err)}`);
+		process.exit(1);
+	}
+}
+
 function loadEnvForSkill(skill?: string) {
 	const dirs = [process.cwd()];
 	if (skill) dirs.push(path.resolve(skill));
 	loadDotenv(dirs);
 }
 
-program
-	.name("skillet")
-	.description("Toolkit for AI agent skills")
-	.version(VERSION);
+program.name("skillet").description("Toolkit for AI agent skills").version(VERSION);
 
 program
 	.command("init")
@@ -58,7 +64,10 @@ program
 program
 	.command("emit")
 	.description("Emit context files for target agent runtimes")
-	.option("--target <targets>", "Comma-separated targets (cursor, claude-code, codex, windsurf, cline, generic)")
+	.option(
+		"--target <targets>",
+		"Comma-separated targets (cursor, claude-code, codex, windsurf, cline, generic)",
+	)
 	.action((opts) => runEmit(opts));
 
 program
@@ -71,65 +80,84 @@ program
 	.description("Show installed skills and their state")
 	.action(() => runStatus());
 
-const evalProgram = program.command("eval").description("Generate, validate, run, and compare skill evals");
+const evalProgram = program
+	.command("eval")
+	.description("Generate, validate, run, and compare skill evals");
 
 evalProgram
 	.command("init")
 	.description("Scaffold a skillet.eval.yaml config file interactively")
-	.action(() => {
-		loadDotenv();
-		runEvalInit();
-	});
+	.action(() =>
+		runEvalCommand(() => {
+			loadDotenv();
+			return runEvalInit();
+		}),
+	);
 
 evalProgram
 	.command("generate [skill]")
 	.description("Auto-generate a starter evals.json from SKILL.md using an LLM")
 	.option("--count <n>", "Number of evals to generate", "3")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill = ".", opts) => {
-		loadEnvForSkill(skill);
-		runGenerate({ ...opts, skill });
-	});
+	.action((skill, opts) =>
+		runEvalCommand(() => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkill(resolvedSkill);
+			return runGenerate({ ...opts, skill: resolvedSkill });
+		}),
+	);
 
 evalProgram
 	.command("fixtures [skill]")
 	.description("Generate fixture files referenced by evals.json using an LLM")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action(async (skill = ".", opts) => {
-		loadEnvForSkill(skill);
-		await runFixtures({ ...opts, skill });
-	});
+	.action((skill, opts) =>
+		runEvalCommand(async () => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkill(resolvedSkill);
+			await runFixtures({ ...opts, skill: resolvedSkill });
+		}),
+	);
 
 evalProgram
 	.command("scaffold [skill]")
 	.description("Generate evals and fixture files in one step (generate + fixtures)")
 	.option("--count <n>", "Number of evals to generate", "3")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action(async (skill = ".", opts) => {
-		loadEnvForSkill(skill);
-		await runScaffold({ ...opts, skill });
-	});
+	.action((skill, opts) =>
+		runEvalCommand(async () => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkill(resolvedSkill);
+			await runScaffold({ ...opts, skill: resolvedSkill });
+		}),
+	);
 
 evalProgram
 	.command("validate [skill]")
 	.description("Pre-flight checks: verify skill directory, evals, and API keys")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill = ".", opts) => {
-		loadEnvForSkill(skill);
-		runValidate({ ...opts, skill });
-	});
+	.action((skill, opts) =>
+		runEvalCommand(() => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkill(resolvedSkill);
+			return runValidate({ ...opts, skill: resolvedSkill });
+		}),
+	);
 
 evalProgram
 	.command("serve [skill]")
 	.description("Serve a local dashboard showing eval results history")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--port <n>", "Port to serve on", "3000")
-	.action((skill = ".", opts) => {
-		loadEnvForSkill(skill);
-		runServe({ ...opts, skill });
-	});
+	.action((skill, opts) =>
+		runEvalCommand(() => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkill(resolvedSkill);
+			return runServe({ ...opts, skill: resolvedSkill });
+		}),
+	);
 
 evalProgram
 	.command("run [skill]")
@@ -144,15 +172,13 @@ evalProgram
 	.option("--timeout <seconds>", "Timeout per eval in seconds", "300")
 	.option("--concurrency <n>", "Max concurrent eval runs (default: all, max 10)")
 	.option("--golden <path>", "Golden benchmark file to compare against for regression")
-	.action(async (skill = ".", opts) => {
-		loadEnvForSkill(skill);
-		try {
-			await runRun({ ...opts, skill });
-		} catch (err) {
-			console.error(`Error: ${extractErrorMessage(err)}`);
-			process.exit(1);
-		}
-	});
+	.action((skill, opts) =>
+		runEvalCommand(async () => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkill(resolvedSkill);
+			await runRun({ ...opts, skill: resolvedSkill });
+		}),
+	);
 
 evalProgram
 	.command("compare <golden> <current>")

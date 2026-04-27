@@ -10,7 +10,11 @@ function exampleSkillArg(skillArg: string) {
 	return skillArg === "." ? "./path-to-skill" : skillArg;
 }
 
-export function exitWithMissingSkillFile(command: string, skillArg: string, skillFile: string): never {
+export function exitWithMissingSkillFile(
+	command: string,
+	skillArg: string,
+	skillFile: string,
+): never {
 	console.error(pc.red(`SKILL.md not found at ${skillFile}`));
 	console.error("");
 	printHintLines([

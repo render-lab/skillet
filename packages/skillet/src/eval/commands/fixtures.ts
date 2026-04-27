@@ -31,11 +31,7 @@ Guidelines:
 - For code files, include a mix of good and bad patterns so the agent has something meaningful to find
 - For data files, include enough rows/entries to be non-trivial (10-50 rows)`;
 
-function buildFixturePrompt(
-	skillContent: string,
-	evalsJson: string,
-	filePaths: string[],
-): string {
+function buildFixturePrompt(skillContent: string, evalsJson: string, filePaths: string[]): string {
 	return `Generate the contents of the following fixture files for this skill's evals.
 
 ## Skill Instructions
@@ -96,10 +92,7 @@ export async function runFixtures(opts: FixturesOpts) {
 
 	const existing = filePaths.filter((f) => fs.existsSync(path.join(paths.skillDir, f)));
 	if (existing.length > 0) {
-		prompts.note(
-			existing.map((f) => `  ${f}`).join("\n"),
-			"Existing fixtures",
-		);
+		prompts.note(existing.map((f) => `  ${f}`).join("\n"), "Existing fixtures");
 		const overwrite = await prompts.confirm({
 			message: `Overwrite ${existing.length} existing fixture(s)?`,
 		});

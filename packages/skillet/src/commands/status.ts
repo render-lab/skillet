@@ -1,10 +1,11 @@
 import path from "node:path";
 import pc from "picocolors";
+import { getLockedSkillEntry } from "../lockfile/entries.js";
 import { readLockfile } from "../lockfile/read.js";
-import { MANIFEST_FILE, ManifestSchema } from "../schemas/manifest.js";
-import { parseSkillSpec } from "../schemas/skill.js";
 import { getCachedSkill } from "../resolver/cache.js";
 import { warnOutdated } from "../resolver/outdated.js";
+import { MANIFEST_FILE, ManifestSchema } from "../schemas/manifest.js";
+import { parseSkillSpec } from "../schemas/skill.js";
 import { exitWithMissingManifest, exitWithNoSkillsDeclared } from "../utils/cli-error.js";
 import { fileExists, readJson } from "../utils/fs.js";
 
@@ -36,8 +37,8 @@ export async function runStatus() {
 	for (const [id, versionSpec] of skillEntries) {
 		const range = typeof versionSpec === "string" ? versionSpec : versionSpec.version;
 
-		const lockKey = locked.find((k) => k.startsWith(`${id}@`));
-		const lockEntry = lockKey && lockfile ? lockfile.resolved[lockKey] : null;
+		const lockedSkill = lockfile ? getLockedSkillEntry(lockfile, id) : null;
+		const lockEntry = lockedSkill?.entry ?? null;
 
 		let status: string;
 		let cached = false;
@@ -53,16 +54,16 @@ export async function runStatus() {
 				lockEntry.sha256,
 			);
 			cached = cachedPath !== null;
-			const version = lockKey?.split("@")[1] || "unknown";
-			status = cached
-				? pc.green(`${version} ✓`)
-				: pc.yellow(`${version} (not cached)`);
+			const version = lockedSkill?.key.split("@").pop() || "unknown";
+			status = cached ? pc.green(`${version} ✓`) : pc.yellow(`${version} (not cached)`);
 		}
 
 		console.log(`  ${pc.bold(id)} ${pc.gray(range)} → ${status}`);
 
 		if (lockEntry?.evalModel) {
-			console.log(pc.gray(`    eval: ${lockEntry.evalModel} (score: ${lockEntry.evalScore ?? "n/a"})`));
+			console.log(
+				pc.gray(`    eval: ${lockEntry.evalModel} (score: ${lockEntry.evalScore ?? "n/a"})`),
+			);
 		}
 	}
 

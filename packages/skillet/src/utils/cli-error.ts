@@ -9,24 +9,28 @@ function printHintLines(lines: string[]) {
 export function exitWithMissingManifest(action: string): never {
 	console.error(pc.red("skills.json not found in the current directory."));
 	console.error("");
-	printHintLines([
-		"Initialize a Skillet project first:",
-		`  ${pc.bold("skillet init")}`,
-		action ? `Then run:` : "",
-		action ? `  ${pc.bold(action)}` : "",
-	].filter(Boolean));
+	printHintLines(
+		[
+			"Initialize a Skillet project first:",
+			`  ${pc.bold("skillet init")}`,
+			action ? "Then run:" : "",
+			action ? `  ${pc.bold(action)}` : "",
+		].filter(Boolean),
+	);
 	process.exit(1);
 }
 
 export function exitWithMissingLockfile(action: string): never {
 	console.error(pc.red("skills.lock not found in the current directory."));
 	console.error("");
-	printHintLines([
-		"Install your declared skills first:",
-		`  ${pc.bold("skillet install")}`,
-		action ? `Then run:` : "",
-		action ? `  ${pc.bold(action)}` : "",
-	].filter(Boolean));
+	printHintLines(
+		[
+			"Install your declared skills first:",
+			`  ${pc.bold("skillet install")}`,
+			action ? "Then run:" : "",
+			action ? `  ${pc.bold(action)}` : "",
+		].filter(Boolean),
+	);
 	process.exit(1);
 }
 

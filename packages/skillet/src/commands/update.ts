@@ -1,9 +1,10 @@
 import path from "node:path";
 import pc from "picocolors";
+import { getLockedSkillEntry, makeResolvedSkillFromLockEntry } from "../lockfile/entries.js";
 import { readLockfile } from "../lockfile/read.js";
 import { buildLockfile, writeLockfile } from "../lockfile/write.js";
 import { resolveSkill } from "../resolver/github.js";
-import { buildGraph, type ResolvedSkill } from "../resolver/graph.js";
+import { type ResolvedSkill, buildGraph } from "../resolver/graph.js";
 import { MANIFEST_FILE, ManifestSchema } from "../schemas/manifest.js";
 import { parseSkillSpec } from "../schemas/skill.js";
 import { exitWithMissingLockfile, exitWithMissingManifest } from "../utils/cli-error.js";
@@ -36,19 +37,16 @@ export async function runUpdate(opts: UpdateOptions) {
 
 	console.log(pc.cyan("Checking for updates...\n"));
 
-	const toCheck = filterIds
-		? skillIds.filter((id) => filterIds.has(id))
-		: skillIds;
+	const toCheck = filterIds ? skillIds.filter((id) => filterIds.has(id)) : skillIds;
 
 	const resolved: ResolvedSkill[] = [];
 	let updated = 0;
 	let failed = 0;
 
 	for (const id of toCheck) {
-		const lockKey = locked.find((k) => k.startsWith(`${id}@`));
-		const lockEntry = lockKey ? lockfile.resolved[lockKey] : null;
-		const lockedSha = lockEntry?.sha256;
-		const lockedVersion = lockKey?.split("@").pop() ?? "unknown";
+		const lockedSkill = getLockedSkillEntry(lockfile, id);
+		const lockedSha = lockedSkill?.entry.sha256;
+		const lockedVersion = lockedSkill?.key.split("@").pop() ?? "unknown";
 
 		const spec = parseSkillSpec(id);
 
@@ -66,9 +64,7 @@ export async function runUpdate(opts: UpdateOptions) {
 					pc.green(`  ✓ ${id}  ${lockedVersion} → ${skill.version} (${skill.sha256.slice(0, 12)})`),
 				);
 			} else {
-				console.log(
-					pc.green(`  ✓ ${id}  content changed (${skill.sha256.slice(0, 12)})`),
-				);
+				console.log(pc.green(`  ✓ ${id}  content changed (${skill.sha256.slice(0, 12)})`));
 			}
 			resolved.push(skill);
 		} catch (err) {
@@ -78,8 +74,8 @@ export async function runUpdate(opts: UpdateOptions) {
 			} else {
 				console.error(pc.red(`  ✗ ${id}: ${err instanceof Error ? err.message : err}`));
 			}
-			if (lockEntry && lockKey) {
-				resolved.push(makeExistingSkill(id, lockKey, lockEntry));
+			if (lockedSkill) {
+				resolved.push(makeResolvedSkillFromLockEntry(id, lockedSkill.key, lockedSkill.entry));
 			}
 		}
 	}
@@ -87,10 +83,9 @@ export async function runUpdate(opts: UpdateOptions) {
 	// Keep skills that weren't checked
 	for (const id of skillIds) {
 		if (toCheck.includes(id)) continue;
-		const lockKey = locked.find((k) => k.startsWith(`${id}@`));
-		const lockEntry = lockKey ? lockfile.resolved[lockKey] : null;
-		if (lockEntry && lockKey) {
-			resolved.push(makeExistingSkill(id, lockKey, lockEntry));
+		const lockedSkill = getLockedSkillEntry(lockfile, id);
+		if (lockedSkill) {
+			resolved.push(makeResolvedSkillFromLockEntry(id, lockedSkill.key, lockedSkill.entry));
 		}
 	}
 
@@ -111,20 +106,4 @@ export async function runUpdate(opts: UpdateOptions) {
 	if (failed > 0) {
 		console.error(pc.yellow(`${failed} skill(s) failed to update (see errors above).`));
 	}
-}
-
-function makeExistingSkill(
-	id: string,
-	key: string,
-	entry: { sha256: string; commitSha: string; source: string },
-): ResolvedSkill {
-	return {
-		spec: parseSkillSpec(id),
-		id,
-		version: key.split("@").pop() || "unversioned",
-		sha256: entry.sha256,
-		commitSha: entry.commitSha,
-		source: entry.source,
-		localPath: "",
-	};
 }

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { type Lockfile, LOCKFILE_NAME, LockfileSchema } from "../schemas/lockfile.js";
+import { LOCKFILE_NAME, type Lockfile, LockfileSchema } from "../schemas/lockfile.js";
 import { fileExists, readJson } from "../utils/fs.js";
 
 export async function readLockfile(projectDir: string): Promise<Lockfile | null> {

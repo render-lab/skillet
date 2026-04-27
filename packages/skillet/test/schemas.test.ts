@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ManifestSchema } from "../src/schemas/manifest.js";
 import { LockfileSchema } from "../src/schemas/lockfile.js";
-import { SkillFrontmatter, extractSkillVersion, formatSkillId, parseSkillSpec } from "../src/schemas/skill.js";
+import { ManifestSchema } from "../src/schemas/manifest.js";
+import {
+	SkillFrontmatter,
+	extractSkillVersion,
+	formatSkillId,
+	parseSkillSpec,
+} from "../src/schemas/skill.js";
 
 describe("ManifestSchema", () => {
 	it("parses a valid manifest", () => {
@@ -39,6 +44,16 @@ describe("ManifestSchema", () => {
 		});
 		const entry = result.skills["owner/repo/skill"];
 		expect(typeof entry).toBe("object");
+	});
+
+	it("does not preserve unsupported top-level manifest fields", () => {
+		const result = ManifestSchema.parse({
+			name: "test",
+			rules: {
+				"owner/repo/rule": "^1.0.0",
+			},
+		});
+		expect("rules" in result).toBe(false);
 	});
 
 	it("rejects invalid injection strategy", () => {
@@ -156,9 +171,7 @@ describe("extractSkillVersion", () => {
 	});
 
 	it("prefers top-level version over metadata.version", () => {
-		expect(
-			extractSkillVersion({ version: "1.0.0", metadata: { version: "2.0.0" } }),
-		).toBe("1.0.0");
+		expect(extractSkillVersion({ version: "1.0.0", metadata: { version: "2.0.0" } })).toBe("1.0.0");
 	});
 
 	it("returns null when no version is present", () => {

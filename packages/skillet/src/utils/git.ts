@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import type { Dirent } from "node:fs";
 import { mkdir, readdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -29,8 +30,8 @@ export async function fetchFromGitHub(
 	owner: string,
 	repo: string,
 	skillPath: string,
-	ref = "main",
 	destDir: string,
+	ref = "main",
 ): Promise<FetchResult> {
 	const repoUrl = `https://github.com/${owner}/${repo}.git`;
 	const tmpDir = path.join(tmpdir(), `skillet-${Date.now()}`);
@@ -58,10 +59,7 @@ export async function fetchFromGitHub(
 				);
 			}
 			if (stderr.includes("couldn't find remote ref")) {
-				throw new GitError(
-					`Branch or tag "${ref}" not found in github.com/${owner}/${repo}`,
-					err,
-				);
+				throw new GitError(`Branch or tag "${ref}" not found in github.com/${owner}/${repo}`, err);
 			}
 			throw new GitError(
 				`Git fetch failed for github.com/${owner}/${repo} (ref: ${ref})\n  ${stderr.trim().split("\n").pop()}`,
@@ -76,7 +74,7 @@ export async function fetchFromGitHub(
 
 		const srcPath = path.join(tmpDir, skillPath);
 
-		let entries;
+		let entries: Dirent[];
 		try {
 			entries = await readdir(srcPath, { withFileTypes: true });
 		} catch {

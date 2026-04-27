@@ -58,8 +58,8 @@ describe("compareBenchmarks", () => {
 
 		const missing = results.find((r) => r.provider === "model-b");
 		expect(missing).toBeDefined();
-		expect(missing!.currentRate).toBe(0);
-		expect(missing!.regressed).toBe(true);
+		expect(missing?.currentRate).toBe(0);
+		expect(missing?.regressed).toBe(true);
 	});
 
 	it("handles multiple providers with mixed results", () => {
@@ -75,8 +75,8 @@ describe("compareBenchmarks", () => {
 		};
 		const results = compareBenchmarks(golden, current);
 
-		expect(results.find((r) => r.provider === "model-a")!.regressed).toBe(false);
-		expect(results.find((r) => r.provider === "model-b")!.regressed).toBe(true);
-		expect(results.find((r) => r.provider === "model-c")!.regressed).toBe(false);
+		expect(results.find((r) => r.provider === "model-a")?.regressed).toBe(false);
+		expect(results.find((r) => r.provider === "model-b")?.regressed).toBe(true);
+		expect(results.find((r) => r.provider === "model-c")?.regressed).toBe(false);
 	});
 });

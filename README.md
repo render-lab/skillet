@@ -78,6 +78,8 @@ skillet status
 
 `skillet install` writes a `skills.lock` file that pins every skill by SHA256 content hash. This ensures reproducible installs across machines and CI environments, regardless of upstream changes.
 
+If some skills fail to resolve during `skillet install`, Skillet preserves their previously locked entries instead of dropping them from the lockfile.
+
 ### Injection strategies
 
 The `inject` config controls how skill context is loaded by the agent:
@@ -181,8 +183,10 @@ Prerequisites: Node.js 20+, [pnpm](https://pnpm.io/)
 # Install dependencies and build
 pnpm install && pnpm build
 
-# Run all tests
+# Run verification
 pnpm test
+pnpm typecheck
+pnpm check
 ```
 
 Try the eval engine on a fixture skill:

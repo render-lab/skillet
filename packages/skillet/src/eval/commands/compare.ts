@@ -42,9 +42,7 @@ export function printComparison(results: CompareResult[], goldenPath: string): b
 
 	const regressed = results.filter((r) => r.regressed);
 	if (regressed.length > 0) {
-		console.log(
-			`\n  ${pc.red(pc.bold(`FAIL: ${regressed.length} provider(s) regressed`))}\n`,
-		);
+		console.log(`\n  ${pc.red(pc.bold(`FAIL: ${regressed.length} provider(s) regressed`))}\n`);
 		return true;
 	}
 

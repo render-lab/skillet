@@ -3,10 +3,15 @@ import pc from "picocolors";
 import type { SkillContent } from "../emitter/base.js";
 import { getEmitters } from "../emitter/factory.js";
 import { readLockfile } from "../lockfile/read.js";
-import { MANIFEST_FILE, ManifestSchema, type TargetRuntime } from "../schemas/manifest.js";
-import { SkillFrontmatter, parseSkillSpec } from "../schemas/skill.js";
 import { getCachedSkill } from "../resolver/cache.js";
 import { warnOutdated } from "../resolver/outdated.js";
+import {
+	MANIFEST_FILE,
+	ManifestSchema,
+	TARGET_RUNTIMES,
+	type TargetRuntime,
+} from "../schemas/manifest.js";
+import { SkillFrontmatter, parseSkillSpec } from "../schemas/skill.js";
 import {
 	exitWithMissingLockfile,
 	exitWithMissingManifest,
@@ -18,16 +23,6 @@ import { fileExists, readJson, readText } from "../utils/fs.js";
 interface EmitOptions {
 	target?: string;
 }
-
-const VALID_TARGETS = [
-	"cursor",
-	"cursor-legacy",
-	"claude-code",
-	"codex",
-	"windsurf",
-	"cline",
-	"generic",
-] as const;
 
 export async function runEmit(opts: EmitOptions) {
 	const cwd = process.cwd();
@@ -45,10 +40,12 @@ export async function runEmit(opts: EmitOptions) {
 		exitWithMissingLockfile("skillet emit");
 	}
 
-	const targets = opts.target ? opts.target.split(",").map((target) => target.trim()) : manifest.config.target;
+	const targets = opts.target
+		? opts.target.split(",").map((target) => target.trim())
+		: manifest.config.target;
 	for (const target of targets) {
-		if (!VALID_TARGETS.includes(target as (typeof VALID_TARGETS)[number])) {
-			exitWithUnknownEmitTarget(target, [...VALID_TARGETS]);
+		if (!TARGET_RUNTIMES.includes(target as TargetRuntime)) {
+			exitWithUnknownEmitTarget(target, [...TARGET_RUNTIMES]);
 		}
 	}
 	const typedTargets = targets as TargetRuntime[];
@@ -56,7 +53,7 @@ export async function runEmit(opts: EmitOptions) {
 	const skills = await loadSkillContents(lockfile, manifest);
 
 	if (skills.length === 0) {
-		console.log(pc.yellow("No skills found in cache. Run \"skillet install\" first."));
+		console.log(pc.yellow('No skills found in cache. Run "skillet install" first.'));
 		return;
 	}
 
@@ -75,7 +72,9 @@ export async function runEmit(opts: EmitOptions) {
 		);
 	}
 
-	console.log(`\n${pc.green(`Emitted ${allFiles.length} file(s) for ${typedTargets.length} target(s).`)}`);
+	console.log(
+		`\n${pc.green(`Emitted ${allFiles.length} file(s) for ${typedTargets.length} target(s).`)}`,
+	);
 
 	await warnOutdated(manifest, lockfile);
 }
@@ -100,9 +99,7 @@ async function loadSkillContents(
 		const { frontmatter, body } = parseFrontmatter(content);
 
 		const parsed = SkillFrontmatter.safeParse(frontmatter);
-		const fm = parsed.success
-			? parsed.data
-			: { name: spec.skillName, description: "" };
+		const fm = parsed.success ? parsed.data : { name: spec.skillName, description: "" };
 
 		const manifestEntry = manifest.skills[id];
 		const inject =

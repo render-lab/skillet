@@ -26,7 +26,8 @@ export function buildGraph(skills: ResolvedSkill[]): DependencyGraph {
 
 	for (const skill of skills) {
 		if (nodes.has(skill.id)) {
-			const existing = nodes.get(skill.id)!;
+			const existing = nodes.get(skill.id);
+			if (!existing) continue;
 			if (existing.sha256 !== skill.sha256) {
 				throw new Error(
 					`Conflicting versions for ${skill.id}: ${existing.version} vs ${skill.version}`,

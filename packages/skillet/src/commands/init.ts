@@ -1,8 +1,23 @@
 import path from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { MANIFEST_FILE, type Manifest, type TargetRuntime } from "../schemas/manifest.js";
+import {
+	MANIFEST_FILE,
+	type Manifest,
+	TARGET_RUNTIMES,
+	type TargetRuntime,
+} from "../schemas/manifest.js";
 import { fileExists, writeJson } from "../utils/fs.js";
+
+const TARGET_LABELS: Record<TargetRuntime, string> = {
+	cursor: "Cursor (modern .mdc rules)",
+	"cursor-legacy": "Cursor (legacy .cursorrules)",
+	"claude-code": "Claude Code (CLAUDE.md)",
+	codex: "Codex (.agents/skills/)",
+	windsurf: "Windsurf (.windsurfrules)",
+	cline: "Cline (.clinerules)",
+	generic: "Generic (agent-context.md)",
+};
 
 export async function runInit() {
 	const cwd = process.cwd();
@@ -27,15 +42,10 @@ export async function runInit() {
 
 	const targets = await p.multiselect({
 		message: "Target runtimes",
-		options: [
-			{ value: "cursor", label: "Cursor (modern .mdc rules)" },
-			{ value: "cursor-legacy", label: "Cursor (legacy .cursorrules)" },
-			{ value: "claude-code", label: "Claude Code (CLAUDE.md)" },
-			{ value: "codex", label: "Codex (.agents/skills/)" },
-			{ value: "windsurf", label: "Windsurf (.windsurfrules)" },
-			{ value: "cline", label: "Cline (.clinerules)" },
-			{ value: "generic", label: "Generic (agent-context.md)" },
-		],
+		options: TARGET_RUNTIMES.map((value) => ({
+			value,
+			label: TARGET_LABELS[value],
+		})),
 		initialValues: ["cursor", "claude-code"],
 		required: true,
 	});

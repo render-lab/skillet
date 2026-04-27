@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import { getLockedSkillEntry } from "../lockfile/entries.js";
 import type { Lockfile } from "../schemas/lockfile.js";
 import type { Manifest } from "../schemas/manifest.js";
 import { extractSkillVersion, parseSkillSpec } from "../schemas/skill.js";
@@ -20,19 +21,16 @@ export async function checkOutdated(
 	lockfile: Lockfile,
 ): Promise<OutdatedSkill[]> {
 	const outdated: OutdatedSkill[] = [];
-	const locked = Object.keys(lockfile.resolved);
 
 	const checks = Object.keys(manifest.skills).map(async (id) => {
-		const lockKey = locked.find((k) => k.startsWith(`${id}@`));
-		if (!lockKey) return null;
+		const lockedSkill = getLockedSkillEntry(lockfile, id);
+		if (!lockedSkill) return null;
 
-		const lockedVersion = lockKey.split("@").pop() ?? "";
+		const lockedVersion = lockedSkill.key.split("@").pop() ?? "";
 		if (lockedVersion === "unversioned") return null;
 
 		const spec = parseSkillSpec(id);
-		const skillMdPath = spec.skillName
-			? `${spec.skillName}/SKILL.md`
-			: "SKILL.md";
+		const skillMdPath = spec.skillName ? `${spec.skillName}/SKILL.md` : "SKILL.md";
 
 		try {
 			const content = await fetchRawFile(spec.owner, spec.repo, "HEAD", skillMdPath);

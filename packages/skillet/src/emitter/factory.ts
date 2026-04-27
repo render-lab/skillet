@@ -1,4 +1,4 @@
-import type { TargetRuntime } from "../schemas/manifest.js";
+import { TARGET_RUNTIMES, type TargetRuntime } from "../schemas/manifest.js";
 import { exitWithUnknownEmitTarget } from "../utils/cli-error.js";
 import type { Emitter } from "./base.js";
 import { ClaudeCodeEmitter } from "./claude-code.js";
@@ -18,7 +18,7 @@ const EMITTERS: Record<TargetRuntime, () => Emitter> = {
 	generic: () => new GenericEmitter(),
 };
 
-const VALID_TARGETS = Object.keys(EMITTERS);
+const VALID_TARGETS = [...TARGET_RUNTIMES];
 
 export function getEmitter(target: TargetRuntime): Emitter {
 	const factory = EMITTERS[target];
