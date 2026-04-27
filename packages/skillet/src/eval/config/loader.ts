@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import YAML from "yaml";
 import { resolveApiKey } from "./env.js";
 import { DEFAULT_MODELS, ENV_KEY_MAP, inferProvider } from "./registry.js";
@@ -34,6 +35,7 @@ function detectProviders(): ProviderConfig[] {
  */
 export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 	const configPath = overrides.configPath ?? "skillet.eval.yaml";
+	const resolvedConfigPath = path.resolve(configPath);
 	let fileConfig: Config | undefined;
 
 	if (overrides.configPath && !fs.existsSync(configPath)) {
@@ -47,6 +49,8 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 		const parsed = YAML.parse(raw);
 		fileConfig = ConfigFileSchema.parse(parsed);
 	}
+
+	const configDir = fileConfig ? path.dirname(resolvedConfigPath) : process.cwd();
 
 	let providers = fileConfig?.providers ?? detectProviders();
 
@@ -113,6 +117,7 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 	return {
 		providers: resolved,
 		grader: { ...graderSource, apiKey: graderKey },
+		skillRoots: (fileConfig?.skills.roots ?? []).map((root) => path.resolve(configDir, root)),
 		settings,
 	};
 }

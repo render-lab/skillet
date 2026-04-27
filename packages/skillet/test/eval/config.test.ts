@@ -55,6 +55,7 @@ describe("loadConfig", () => {
 			timeout: 42,
 			temperature: 0,
 		});
+		expect(config.skillRoots).toEqual([]);
 	});
 
 	it("uses config-file providers and honors provider filtering", async () => {
@@ -74,6 +75,10 @@ describe("loadConfig", () => {
 				"grader:",
 				"  provider: anthropic",
 				"  model: claude-sonnet-4-6",
+				"skills:",
+				"  roots:",
+				"    - ./skills",
+				"    - ../shared-skills",
 				"settings:",
 				"  maxSteps: 7",
 				"  timeout: 120",
@@ -106,6 +111,10 @@ describe("loadConfig", () => {
 			runsPerProvider: 2,
 			temperature: 0.3,
 		});
+		expect(config.skillRoots).toEqual([
+			path.join(tmpDir, "skills"),
+			path.resolve(tmpDir, "../shared-skills"),
+		]);
 	});
 
 	it("lets --model overrides replace detected providers and infer missing provider names", () => {

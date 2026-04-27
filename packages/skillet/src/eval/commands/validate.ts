@@ -1,18 +1,20 @@
 import fs from "node:fs";
 import pc from "picocolors";
-import { loadConfig, resolveSkillPaths } from "../config.js";
+import { loadConfig, resolveSkillPaths, resolveSkillSelection } from "../config.js";
 import { EvalsFileSchema } from "../schemas/evals.js";
 import { extractErrorMessage } from "../utils/error.js";
 
 interface ValidateOpts {
-	skills: string[];
+	skills?: string[];
 	evals?: string;
 	config?: string;
 }
 
 export async function runValidate(opts: ValidateOpts) {
+	const config = loadConfig({ configPath: opts.config });
+	const skills = resolveSkillSelection(opts.skills, config.skillRoots);
 	let hasError = false;
-	const multipleSkills = opts.skills.length > 1;
+	const multipleSkills = skills.length > 1;
 
 	if (multipleSkills && opts.evals) {
 		throw new Error("--evals can only be used when validating a single skill.");
@@ -28,7 +30,7 @@ export async function runValidate(opts: ValidateOpts) {
 
 	console.log(pc.bold("\nSkill Eval — Validate\n"));
 
-	for (const [index, skill] of opts.skills.entries()) {
+	for (const [index, skill] of skills.entries()) {
 		if (multipleSkills) {
 			if (index > 0) console.log("");
 			console.log(pc.bold(`Skill: ${skill}`));
@@ -66,13 +68,8 @@ export async function runValidate(opts: ValidateOpts) {
 			);
 		}
 
-		try {
-			const config = loadConfig({ configPath: opts.config });
-			for (const p of config.providers) {
-				pass(`${p.model}: API key valid`);
-			}
-		} catch (err) {
-			fail(`Config: ${extractErrorMessage(err)}`);
+		for (const p of config.providers) {
+			pass(`${p.model}: API key valid`);
 		}
 	}
 

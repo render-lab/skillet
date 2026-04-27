@@ -7,7 +7,7 @@
 > [!IMPORTANT]
 > **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
 
-Skillet helps you manage AI agent skills with reproducible installs, runtime-specific context emission, and built-in evals.
+Skillet helps teams manage AI agent skills with reproducible installs and runtime-specific context emission. It also includes an eval toolkit for skill authors and maintainers.
 
 AI agents work best when you give them explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, emit runtime-specific context, and benchmark how well a model follows those instructions.
 
@@ -15,10 +15,10 @@ AI agents work best when you give them explicit instructions for specialized tas
 
 Skillet exposes a single CLI:
 
-- `skillet ...` for package-management workflows
-- `skillet eval ...` for evaluation workflows
+- `skillet ...` for teams consuming skills in a project
+- `skillet eval ...` for authors evaluating and improving skills
 
-Use `skillet` when you want to install and emit skills for an agent runtime. Use `skillet eval` when you want to generate eval cases, validate a skill, and measure how well a model follows it.
+Use `skillet` when you want to declare skill dependencies, install them, and emit them for an agent runtime. Use `skillet eval` when you maintain a set of local skills and want to generate eval cases, validate them, and measure how well a model follows them.
 
 ## How skills work
 
@@ -44,7 +44,7 @@ Be thorough but concise. Focus on actionable findings, not nitpicks.
 
 Skills live in GitHub repositories at paths like `owner/repo/skills/my-skill`. You reference them with specifiers like `owner/repo/skills/my-skill@^1.0.0`.
 
-## Package management
+## Using skills in a project
 
 Running `skillet init` creates a `skills.json` manifest in your project:
 
@@ -104,9 +104,20 @@ The `inject` config controls how skill context is loaded by the agent:
 | `cline` | `.clinerules` |
 | `generic` | `agent-context.md` |
 
-## Evaluation
+### Typical consumer flow
 
-`skillet eval` measures how well an agent follows a skill's instructions. It runs an actual agent loop, with tool calls for bash and file I/O, inside a sandboxed temp directory and grades the resulting transcript with an LLM judge.
+```bash
+skillet init
+skillet add owner/repo/skills/my-skill@^1.0
+skillet install
+skillet emit --target cursor
+```
+
+## Evaluating a skill
+
+`skillet eval` is for skill authors and maintainers. It measures how well an agent follows a skill's instructions. It runs an actual agent loop, with tool calls for bash and file I/O, inside a sandboxed temp directory and grades the resulting transcript with an LLM judge.
+
+Run `skillet eval init` once per project to create `skillet.eval.yaml`. That file configures providers, grader settings, and the local skill roots that `skillet eval` uses to discover skills by default.
 
 ### Eval definitions
 
@@ -136,29 +147,27 @@ Evals support single prompts and multi-turn conversations via a `turns` array.
 
 ```bash
 skillet eval init
+skillet eval scaffold
+skillet eval validate
+skillet eval run
 skillet eval generate ./my-skill
 skillet eval fixtures ./my-skill
-skillet eval scaffold ./my-skill
-skillet eval validate ./my-skill
-skillet eval run ./my-skill
-skillet eval validate ./skill-a ./skill-b
-skillet eval run ./skill-a ./skill-b
 skillet eval serve ./my-skill
 ```
 
-`skillet eval` runs evals against Anthropic, OpenAI, and Google models. Configure API keys via environment variables such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GOOGLE_API_KEY`. By default, eval config lives in `skillet.eval.yaml`, and results are written to `.skillet-evals/results/<skill-name>/`.
-
-The TypeScript implementation lives in `packages/skillet/`, with eval internals under `src/eval/`. A Python reference implementation lives in `packages/skillet-eval-python/`.
+`skillet eval` runs evals against Anthropic, OpenAI, and Google models. Configure API keys via environment variables such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GOOGLE_API_KEY`. By default, eval config lives in `skillet.eval.yaml`, discovered skills come from the configured local roots, and results are written to `.skillet-evals/results/<skill-name>/`.
 
 ### Typical eval flow
 
 ```bash
 skillet eval init
-skillet eval scaffold ./my-skill
-skillet eval validate ./my-skill
-skillet eval run ./my-skill
-skillet eval serve ./my-skill
+skillet eval scaffold
+skillet eval validate
+skillet eval run
+skillet eval serve
 ```
+
+The TypeScript implementation lives in `packages/skillet/`, with eval internals under `src/eval/`. A Python reference implementation lives in `packages/skillet-eval-python/`.
 
 ## Project structure
 
@@ -175,9 +184,9 @@ skillet/
 └── skills.lock                # Pinned skill versions
 ```
 
-## Using skillet in a project
+## Try it
 
-If you want to manage skills in your own project, start with:
+To try skill consumption in your own project, run:
 
 ```bash
 skillet init
@@ -186,7 +195,7 @@ skillet install
 skillet emit --target cursor
 ```
 
-If you want to try the eval engine on a fixture skill, run:
+To try the eval engine against a fixture skill in this repo, run:
 
 ```bash
 skillet eval run fixtures/skills/code-review

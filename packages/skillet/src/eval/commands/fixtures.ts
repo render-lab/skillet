@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as prompts from "@clack/prompts";
 import pc from "picocolors";
-import { loadConfig, resolveSkillPaths } from "../config.js";
+import { loadConfig, resolveSkillPaths, resolveSkillSelection } from "../config.js";
 import { createProvider } from "../providers/factory.js";
 import { Spinner } from "../runner/spinner.js";
 import type { EvalsFile } from "../schemas/evals.js";
@@ -61,12 +61,35 @@ function collectFilePaths(evals: EvalsFile["evals"]): string[] {
 }
 
 export interface FixturesOpts {
-	skill: string;
+	skills?: string[];
 	evals?: string;
 	config?: string;
 }
 
 export async function runFixtures(opts: FixturesOpts) {
+	const config = loadConfig({ configPath: opts.config });
+	const skills = resolveSkillSelection(opts.skills, config.skillRoots);
+
+	if (skills.length > 1 && opts.evals) {
+		throw new Error("--evals can only be used when generating fixtures for a single skill.");
+	}
+
+	prompts.intro(pc.bold("skillet eval fixtures"));
+
+	const provider = createProvider(config.providers[0]);
+	for (const [index, skill] of skills.entries()) {
+		if (index > 0) console.log("");
+		await runFixturesForSkill({ skill, evals: opts.evals, provider });
+	}
+
+	prompts.outro(`${skills.length} skill(s) processed`);
+}
+
+async function runFixturesForSkill(opts: {
+	skill: string;
+	evals?: string;
+	provider: ReturnType<typeof createProvider>;
+}) {
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
 	const skillArg = opts.skill || ".";
 
@@ -82,14 +105,11 @@ export async function runFixtures(opts: FixturesOpts) {
 	const filePaths = collectFilePaths(evalsFile.evals);
 
 	if (filePaths.length === 0) {
-		prompts.intro(pc.bold("skillet eval fixtures"));
-		prompts.log.info("No fixture files referenced in evals — nothing to generate.");
-		prompts.outro("Done");
+		prompts.log.info(`No fixture files referenced in ${pc.bold(paths.skillDir)} — nothing to generate.`);
 		return;
 	}
 
-	prompts.intro(pc.bold("skillet eval fixtures"));
-
+	prompts.log.info(`Skill: ${pc.bold(paths.skillDir)}`);
 	const existing = filePaths.filter((f) => fs.existsSync(path.join(paths.skillDir, f)));
 	if (existing.length > 0) {
 		prompts.note(existing.map((f) => `  ${f}`).join("\n"), "Existing fixtures");
@@ -117,12 +137,10 @@ export async function runFixtures(opts: FixturesOpts) {
 		prompts.log.info(`  ${pc.dim(f)}`);
 	}
 
-	const config = loadConfig({ configPath: opts.config });
-	const provider = createProvider(config.providers[0]);
 	const skillContent = fs.readFileSync(paths.skillFile, "utf-8");
 
 	const spinner = new Spinner();
-	spinner.start(`Generating fixtures with ${provider.modelId}`);
+	spinner.start(`Generating fixtures with ${opts.provider.modelId}`);
 
 	const prompt = buildFixturePrompt(skillContent, rawEvals, filePaths);
 	const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
@@ -137,7 +155,7 @@ export async function runFixtures(opts: FixturesOpts) {
 			spinner.start(`Retrying fixture generation (attempt ${attempt}/${MAX_ATTEMPTS})`);
 		}
 
-		const response = await provider.chat({
+		const response = await opts.provider.chat({
 			system: FIXTURE_SYSTEM_PROMPT,
 			messages: chatMessages,
 			temperature: 0.3,

@@ -147,6 +147,37 @@ describe("multi-skill eval commands", () => {
 		expect(resultDirs.sort()).toEqual(["skill-a", "skill-b"]);
 	});
 
+	it("discovers all configured skills for validate and run when none are passed", async () => {
+		const skillA = await createSkill(tmpDir, "fixtures/skills/skill-a");
+		const skillB = await createSkill(tmpDir, "fixtures/skills/skill-b");
+		const configPath = path.join(tmpDir, "skillet.eval.yaml");
+		await writeFile(
+			configPath,
+			[
+				"providers:",
+				"  - name: openai",
+				"    model: gpt-5.4",
+				"    apiKey: ${OPENAI_API_KEY}",
+				"skills:",
+				"  roots:",
+				"    - ./fixtures/skills",
+				"",
+			].join("\n"),
+		);
+
+		await runValidate({ config: configPath });
+		await runRun({
+			config: configPath,
+			runs: "1",
+			timeout: "5",
+		});
+
+		const logs = vi.mocked(console.log).mock.calls.flat().join("\n");
+		expect(logs).toContain(`Skill: ${skillA}`);
+		expect(logs).toContain(`Skill: ${skillB}`);
+		expect(runOrchestratorMock).toHaveBeenCalledTimes(2);
+	});
+
 	it("continues across skills and exits once if any run fails", async () => {
 		const skillA = await createSkill(tmpDir, "skill-a");
 		const missingSkill = path.join(tmpDir, "skill-missing");

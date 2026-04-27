@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
-import { PROVIDER_REGISTRY, loadConfig, resolveSkillPaths } from "../config.js";
+import { PROVIDER_REGISTRY, loadConfig, resolveSkillPaths, resolveSkillSelection } from "../config.js";
 import { printResults } from "../report/console-reporter.js";
 import { writeDashboard } from "../report/html-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
@@ -18,7 +18,7 @@ import { VERSION } from "../version.js";
 import { compareBenchmarks, printComparison } from "./compare.js";
 
 export interface RunOpts {
-	skills: string[];
+	skills?: string[];
 	evals?: string;
 	config?: string;
 	evalId?: string;
@@ -42,7 +42,9 @@ Use the available tools (bash, read_file, write_file, list_directory) to complet
 }
 
 export async function runRun(opts: RunOpts) {
-	const multipleSkills = opts.skills.length > 1;
+	const discoveryConfig = loadConfig({ configPath: opts.config });
+	const skills = resolveSkillSelection(opts.skills, discoveryConfig.skillRoots);
+	const multipleSkills = skills.length > 1;
 	let hadError = false;
 
 	if (multipleSkills && opts.evals) {
@@ -52,7 +54,7 @@ export async function runRun(opts: RunOpts) {
 		throw new Error("--golden can only be used when running a single skill.");
 	}
 
-	for (const [index, skill] of opts.skills.entries()) {
+	for (const [index, skill] of skills.entries()) {
 		if (multipleSkills && index > 0) {
 			console.log("");
 		}

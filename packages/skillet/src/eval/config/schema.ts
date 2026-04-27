@@ -11,9 +11,14 @@ export const GraderConfigSchema = z.object({
 	model: z.string(),
 });
 
+export const SkillDiscoveryConfigSchema = z.object({
+	roots: z.array(z.string()).default([]),
+});
+
 export const ConfigFileSchema = z.object({
 	providers: z.array(ProviderConfigSchema).min(1),
 	grader: GraderConfigSchema.optional(),
+	skills: SkillDiscoveryConfigSchema.default({}),
 	settings: z
 		.object({
 			maxSteps: z.number().int().positive().default(20),
@@ -26,11 +31,13 @@ export const ConfigFileSchema = z.object({
 
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 export type GraderConfig = z.infer<typeof GraderConfigSchema>;
+export type SkillDiscoveryConfig = z.infer<typeof SkillDiscoveryConfigSchema>;
 export type Config = z.infer<typeof ConfigFileSchema>;
 
 export interface ResolvedConfig {
 	providers: Array<ProviderConfig & { apiKey: string }>;
 	grader: GraderConfig & { apiKey: string };
+	skillRoots: string[];
 	settings: Config["settings"];
 }
 

@@ -36,14 +36,9 @@ async function runEvalCommand(command: () => void | Promise<void>) {
 	}
 }
 
-function normalizeSkills(skills?: string[]) {
-	return skills && skills.length > 0 ? skills : ["."];
-}
-
 function loadEnvForSkills(skills?: string[]) {
-	const normalizedSkills = normalizeSkills(skills);
 	const dirs = [process.cwd()];
-	for (const skill of normalizedSkills) {
+	for (const skill of skills ?? []) {
 		dirs.push(path.resolve(skill));
 	}
 	loadDotenv(dirs);
@@ -102,41 +97,38 @@ evalProgram
 	);
 
 evalProgram
-	.command("generate [skill]")
-	.description("Auto-generate a starter evals.json from SKILL.md using an LLM")
+	.command("generate [skills...]")
+	.description("Auto-generate starter evals.json files from SKILL.md using an LLM")
 	.option("--count <n>", "Number of evals to generate", "3")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill, opts) =>
+	.action((skills, opts) =>
 		runEvalCommand(() => {
-			const resolvedSkill = skill ?? ".";
-			loadEnvForSkills([resolvedSkill]);
-			return runGenerate({ ...opts, skill: resolvedSkill });
+			loadEnvForSkills(skills);
+			return runGenerate({ ...opts, skills });
 		}),
 	);
 
 evalProgram
-	.command("fixtures [skill]")
+	.command("fixtures [skills...]")
 	.description("Generate fixture files referenced by evals.json using an LLM")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill, opts) =>
+	.action((skills, opts) =>
 		runEvalCommand(async () => {
-			const resolvedSkill = skill ?? ".";
-			loadEnvForSkills([resolvedSkill]);
-			await runFixtures({ ...opts, skill: resolvedSkill });
+			loadEnvForSkills(skills);
+			await runFixtures({ ...opts, skills });
 		}),
 	);
 
 evalProgram
-	.command("scaffold [skill]")
+	.command("scaffold [skills...]")
 	.description("Generate evals and fixture files in one step (generate + fixtures)")
 	.option("--count <n>", "Number of evals to generate", "3")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill, opts) =>
+	.action((skills, opts) =>
 		runEvalCommand(async () => {
-			const resolvedSkill = skill ?? ".";
-			loadEnvForSkills([resolvedSkill]);
-			await runScaffold({ ...opts, skill: resolvedSkill });
+			loadEnvForSkills(skills);
+			await runScaffold({ ...opts, skills });
 		}),
 	);
 
@@ -147,9 +139,8 @@ evalProgram
 	.option("--config <path>", "Path to skillet.eval.yaml")
 	.action((skills, opts) =>
 		runEvalCommand(() => {
-			const resolvedSkills = normalizeSkills(skills);
-			loadEnvForSkills(resolvedSkills);
-			return runValidate({ ...opts, skills: resolvedSkills });
+			loadEnvForSkills(skills);
+			return runValidate({ ...opts, skills });
 		}),
 	);
 
@@ -181,9 +172,8 @@ evalProgram
 	.option("--golden <path>", "Golden benchmark file to compare against for regression")
 	.action((skills, opts) =>
 		runEvalCommand(async () => {
-			const resolvedSkills = normalizeSkills(skills);
-			loadEnvForSkills(resolvedSkills);
-			await runRun({ ...opts, skills: resolvedSkills });
+			loadEnvForSkills(skills);
+			await runRun({ ...opts, skills });
 		}),
 	);
 

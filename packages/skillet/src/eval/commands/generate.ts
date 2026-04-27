@@ -2,7 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import * as prompts from "@clack/prompts";
 import pc from "picocolors";
-import { PROVIDER_REGISTRY, inferProvider, loadConfig, resolveSkillPaths } from "../config.js";
+import {
+	PROVIDER_REGISTRY,
+	inferProvider,
+	loadConfig,
+	resolveSkillPaths,
+	resolveSkillSelection,
+} from "../config.js";
 import { createProvider } from "../providers/factory.js";
 import { PRICING } from "../providers/pricing.js";
 import { Spinner } from "../runner/spinner.js";
@@ -138,23 +144,17 @@ function buildModelOptions(): Array<{ value: string; label: string; hint?: strin
 }
 
 interface GenerateOpts {
-	skill: string;
+	skills?: string[];
 	count?: string;
 	config?: string;
 }
 
 export async function runGenerate(opts: GenerateOpts) {
 	const count = Number(opts.count ?? 3);
-	const paths = resolveSkillPaths(opts.skill);
-	const skillArg = opts.skill || ".";
-
-	if (!fs.existsSync(paths.skillFile)) {
-		exitWithMissingSkillFile("generate", skillArg, paths.skillFile);
-	}
+	const config = loadConfig({ configPath: opts.config });
+	const skills = resolveSkillSelection(opts.skills, config.skillRoots);
 
 	prompts.intro(pc.bold("skillet eval generate"));
-
-	// Model selection
 	const modelOptions = buildModelOptions();
 	const defaultModels = Object.values(PROVIDER_REGISTRY).map((e) => e.defaultModel);
 
@@ -178,13 +178,42 @@ export async function runGenerate(opts: GenerateOpts) {
 		),
 	);
 
-	const config = loadConfig({ configPath: opts.config });
 	const provider = createProvider(config.providers[0]);
 
-	prompts.log.info(`Skill: ${pc.bold(paths.skillDir)}`);
 	prompts.log.info(`Generator: ${pc.bold(provider.modelId)}`);
 	prompts.log.info(`Models: ${pc.bold(models.join(", "))}`);
 	prompts.log.info(`Count: ${pc.bold(String(finalCount))} eval(s)`);
+
+	for (const [index, skill] of skills.entries()) {
+		if (index > 0) console.log("");
+		await runGenerateForSkill({
+			skill,
+			models,
+			count: finalCount,
+			provider,
+		});
+	}
+
+	prompts.outro(`${skills.length} skill(s) processed`);
+}
+
+async function runGenerateForSkill(opts: {
+	skill: string;
+	models: string[];
+	count: number;
+	provider: ReturnType<typeof createProvider>;
+}) {
+	const paths = resolveSkillPaths(opts.skill);
+	const skillArg = opts.skill || ".";
+
+	if (!fs.existsSync(paths.skillFile)) {
+		exitWithMissingSkillFile("generate", skillArg, paths.skillFile);
+	}
+
+	prompts.log.info(`Skill: ${pc.bold(paths.skillDir)}`);
+	prompts.log.info(`Generator: ${pc.bold(opts.provider.modelId)}`);
+	prompts.log.info(`Models: ${pc.bold(opts.models.join(", "))}`);
+	prompts.log.info(`Count: ${pc.bold(String(opts.count))} eval(s)`);
 
 	const skillContent = fs.readFileSync(paths.skillFile, "utf-8");
 	const references = readReferences(paths.skillDir);
@@ -193,9 +222,9 @@ export async function runGenerate(opts: GenerateOpts) {
 	}
 
 	const spinner = new Spinner();
-	spinner.start(`Generating ${finalCount} eval(s) with ${provider.modelId}`);
+	spinner.start(`Generating ${opts.count} eval(s) with ${opts.provider.modelId}`);
 
-	const prompt = buildGeneratePrompt(skillContent, references, finalCount, models);
+	const prompt = buildGeneratePrompt(skillContent, references, opts.count, opts.models);
 
 	const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
 		{ role: "user", content: prompt },
@@ -209,7 +238,7 @@ export async function runGenerate(opts: GenerateOpts) {
 			spinner.start(`Retrying generation (attempt ${attempt}/${MAX_ATTEMPTS})`);
 		}
 
-		const response = await provider.chat({
+		const response = await opts.provider.chat({
 			system: GENERATE_SYSTEM_PROMPT,
 			messages: chatMessages,
 			temperature: 0.3,
@@ -259,7 +288,7 @@ export async function runGenerate(opts: GenerateOpts) {
 	}
 
 	// Ensure the selected models are in the output
-	evalsFile.models = models;
+	evalsFile.models = opts.models;
 
 	const outputPath = path.join(paths.skillDir, "evals.json");
 	let writePath = outputPath;
@@ -286,7 +315,7 @@ export async function runGenerate(opts: GenerateOpts) {
 		}
 	}
 
-	prompts.outro(
-		`${models.length} model(s) configured · ${evalsFile.evals.length} eval(s) generated`,
+	prompts.log.success(
+		`${opts.models.length} model(s) configured · ${evalsFile.evals.length} eval(s) generated`,
 	);
 }

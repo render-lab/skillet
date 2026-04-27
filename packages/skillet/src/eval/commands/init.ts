@@ -1,8 +1,9 @@
 import fs from "node:fs";
+import path from "node:path";
 import * as prompts from "@clack/prompts";
 import pc from "picocolors";
 import YAML from "yaml";
-import { PROVIDER_REGISTRY } from "../config.js";
+import { PROVIDER_REGISTRY, suggestSkillRoots } from "../config.js";
 import { exitIfCancelled } from "../utils/prompt.js";
 
 export async function runInit() {
@@ -78,6 +79,15 @@ export async function runInit() {
 	}
 
 	const graderProvider = selectedProviders[0];
+	const detectedRoots = suggestSkillRoots(process.cwd());
+	const localSkillRoots = exitIfCancelled(
+		await prompts.text({
+			message: "Local skill roots (comma-separated, optional)",
+			placeholder: "skills, fixtures/skills, .agents/skills",
+			initialValue: detectedRoots.join(", "),
+		}),
+	) as string;
+
 	const config = {
 		providers,
 		grader: {
@@ -85,6 +95,12 @@ export async function runInit() {
 			model:
 				providers.find((p) => p.name === graderProvider)?.model ??
 				PROVIDER_REGISTRY[graderProvider]?.defaultModel,
+		},
+		skills: {
+			roots: localSkillRoots
+				.split(",")
+				.map((root) => root.trim())
+				.filter(Boolean),
 		},
 		settings: {
 			maxSteps: 20,
