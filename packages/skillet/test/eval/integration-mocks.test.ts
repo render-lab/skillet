@@ -101,6 +101,59 @@ describe("createIntegrationMockEnvironment", () => {
 		}
 	});
 
+	it("imports YAML OpenAPI specs", async () => {
+		const dir = await mkdtemp(path.join(tmpdir(), "skillet-yaml-openapi-"));
+		dirs.push(dir);
+		const openapiPath = path.join(dir, "openapi.yaml");
+		await writeFile(
+			openapiPath,
+			[
+				"openapi: 3.0.0",
+				"paths:",
+				"  /services/{id}:",
+				"    get:",
+				"      responses:",
+				"        '200':",
+				"          description: ok",
+				"",
+			].join("\n"),
+		);
+		const manifests = await writeIntegrationMockManifests(
+			{
+				render: { openapi: openapiPath, expose: ["http"], tools: [] },
+			},
+			dir,
+		);
+
+		expect(manifests[0]?.httpRoutes).toEqual([
+			expect.objectContaining({ key: "GET /services/{id}" }),
+		]);
+	});
+
+	it("reports oapi-codegen configs as the wrong OpenAPI source", async () => {
+		const dir = await mkdtemp(path.join(tmpdir(), "skillet-oapi-config-"));
+		dirs.push(dir);
+		const openapiPath = path.join(dir, "oapi-codegen.yaml");
+		await writeFile(
+			openapiPath,
+			[
+				"package: common",
+				"output: ''",
+				"import-mapping:",
+				"  ./autoscaling.yaml: github.com/example/autoscaling",
+				"",
+			].join("\n"),
+		);
+		const manifests = await writeIntegrationMockManifests(
+			{
+				render: { openapi: openapiPath, expose: ["http"], tools: [] },
+			},
+			dir,
+		);
+
+		expect(manifests[0]?.errors[0]).toContain("looks like an oapi-codegen config");
+	});
+
 	it("imports MCP descriptor tools and resolves responses from scenario state", async () => {
 		const { mcpDir } = await makeSources();
 		const config: Record<string, MockIntegrationConfig> = {

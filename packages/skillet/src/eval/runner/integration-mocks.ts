@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import YAML from "yaml";
 import { z } from "zod";
 import type { MockIntegrationConfig, MockToolConfig } from "../config/schema.js";
 import type { ToolDefinition, ToolHandler } from "../providers/types.js";
@@ -97,30 +98,48 @@ function githubReadmeUrl(source: string): string | undefined {
 	return `https://raw.githubusercontent.com/${match[1]}/${match[2].replace(/\.git$/, "")}/main/README.md`;
 }
 
-async function readJsonSource(source: string): Promise<unknown> {
+function parseStructuredSource(source: string, text: string): unknown {
+	if (/^\s*</.test(text)) {
+		throw new Error(`${source} contains HTML, not an OpenAPI document.`);
+	}
+	try {
+		return JSON.parse(text);
+	} catch {
+		return YAML.parse(text);
+	}
+}
+
+async function readStructuredSource(source: string): Promise<unknown> {
 	if (isUrl(source)) {
-		const response = await fetch(source);
+		const response = await fetch(source, {
+			headers: {
+				accept: "application/json, application/yaml, text/yaml, text/plain",
+				"user-agent": "skillet-eval",
+			},
+		});
 		if (!response.ok) throw new Error(`Failed to fetch ${source}: ${response.status}`);
 		const contentType = response.headers.get("content-type") ?? "";
 		const text = await response.text();
 		if (!contentType.includes("json") && /^\s*</.test(text)) {
 			throw new Error(
-				`${source} returned HTML, not JSON. Use a raw OpenAPI JSON/YAML URL or a local spec file.`,
+				`${source} returned HTML, not an OpenAPI document. Use a raw OpenAPI JSON/YAML URL or a local spec file.`,
 			);
 		}
-		return JSON.parse(text);
+		return parseStructuredSource(source, text);
 	}
 	const text = fs.readFileSync(source, "utf-8");
-	if (/^\s*</.test(text)) {
-		throw new Error(`${source} contains HTML, not JSON. Use an OpenAPI JSON file.`);
-	}
-	return JSON.parse(text);
+	return parseStructuredSource(source, text);
 }
 
 async function readTextSource(source: string): Promise<string> {
 	const readmeUrl = githubReadmeUrl(source);
 	if (isUrl(source) || readmeUrl) {
-		const response = await fetch(readmeUrl ?? source);
+		const response = await fetch(readmeUrl ?? source, {
+			headers: {
+				accept: "text/markdown,text/plain,*/*",
+				"user-agent": "skillet-eval",
+			},
+		});
 		if (!response.ok) throw new Error(`Failed to fetch ${source}: ${response.status}`);
 		return response.text();
 	}
@@ -168,9 +187,16 @@ async function importOpenApiRoutes(
 ): Promise<RouteDefinition[]> {
 	const routes: RouteDefinition[] = [];
 	for (const source of sources) {
-		const spec = (await readJsonSource(source)) as JsonObject;
+		const spec = (await readStructuredSource(source)) as JsonObject;
+		if (spec["import-mapping"] && !spec.paths) {
+			throw new Error(
+				`${source} looks like an oapi-codegen config, not an OpenAPI spec. Point openapi at the spec file that contains "openapi" and "paths".`,
+			);
+		}
 		const paths = spec.paths;
-		if (!paths || typeof paths !== "object") continue;
+		if (!paths || typeof paths !== "object") {
+			throw new Error(`${source} is missing OpenAPI "paths".`);
+		}
 		for (const [routePath, pathItem] of Object.entries(paths as JsonObject)) {
 			if (!pathItem || typeof pathItem !== "object") continue;
 			for (const [method, operation] of Object.entries(pathItem as JsonObject)) {

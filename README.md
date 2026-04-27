@@ -171,7 +171,7 @@ This feature is opt-in. If `skillet.eval.yaml` has no `integrations` block, or i
 Run `skillet eval init` and answer yes when prompted to configure integration mocks. For each integration, provide:
 
 - an integration name, such as `render`, `stripe`, or `github`
-- an OpenAPI spec path or URL
+- an OpenAPI JSON or YAML spec path or URL
 - an MCP server repo or local path
 - which surfaces to expose: `http`, `tools`, or both
 
@@ -234,6 +234,8 @@ When you expose `http`, Skillet reads the configured OpenAPI spec and creates lo
 
 Supported behavior:
 
+- JSON and YAML OpenAPI documents are supported.
+- The file must be the OpenAPI document itself, with `openapi` and `paths`. Do not point `openapi` at an `oapi-codegen` config file.
 - `GET`, `POST`, `PUT`, `PATCH`, and `DELETE` operations are imported.
 - Path parameters such as `/services/{id}` are matched against incoming requests.
 - If an operation includes an `application/json` example response, Skillet can use it as the default response.
