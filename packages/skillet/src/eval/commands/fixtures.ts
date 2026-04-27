@@ -7,8 +7,9 @@ import { createProvider } from "../providers/factory.js";
 import { Spinner } from "../runner/spinner.js";
 import type { EvalsFile } from "../schemas/evals.js";
 import { EvalsFileSchema } from "../schemas/evals.js";
-import { extractJson } from "../utils/json.js";
+import { exitWithMissingEvalsFile, exitWithMissingSkillFile } from "../utils/cli-error.js";
 import { extractErrorMessage } from "../utils/error.js";
+import { extractJson } from "../utils/json.js";
 
 const FIXTURE_SYSTEM_PROMPT = `You generate realistic input files for AI agent skill evaluations.
 
@@ -71,17 +72,13 @@ export interface FixturesOpts {
 
 export async function runFixtures(opts: FixturesOpts) {
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
+	const skillArg = opts.skill || ".";
 
 	if (!fs.existsSync(paths.skillFile)) {
-		console.error(pc.red(`SKILL.md not found at ${paths.skillFile}`));
-		process.exit(1);
+		exitWithMissingSkillFile("fixtures", skillArg, paths.skillFile);
 	}
 	if (!fs.existsSync(paths.evalsFile)) {
-		console.error(pc.red(`evals.json not found at ${paths.evalsFile}`));
-		console.error(
-			`\nRun ${pc.bold(`skillet eval generate ${opts.skill}`)} first to create evals.json.\n`,
-		);
-		process.exit(1);
+		exitWithMissingEvalsFile("fixtures", skillArg, paths.evalsFile, Boolean(opts.evals));
 	}
 
 	const rawEvals = fs.readFileSync(paths.evalsFile, "utf-8");

@@ -9,6 +9,7 @@ import { buildGraph } from "../resolver/graph.js";
 import { readLockfile } from "../lockfile/read.js";
 import { buildLockfile, writeLockfile } from "../lockfile/write.js";
 import { fileExists, readJson, writeJson } from "../utils/fs.js";
+import { exitWithMissingManifest } from "../utils/cli-error.js";
 import { GitError } from "../utils/git.js";
 
 interface AddOptions {
@@ -21,8 +22,7 @@ export async function runAdd(opts: AddOptions) {
 	const manifestPath = path.join(cwd, MANIFEST_FILE);
 
 	if (!(await fileExists(manifestPath))) {
-		console.error(pc.red(`No ${MANIFEST_FILE} found. Run "skillet init" first.`));
-		process.exit(1);
+		exitWithMissingManifest("skillet add <owner/repo/skills/my-skill>");
 	}
 
 	const raw = await readJson(manifestPath);

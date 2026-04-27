@@ -1,4 +1,5 @@
 import type { TargetRuntime } from "../schemas/manifest.js";
+import { exitWithUnknownEmitTarget } from "../utils/cli-error.js";
 import type { Emitter } from "./base.js";
 import { ClaudeCodeEmitter } from "./claude-code.js";
 import { ClineEmitter } from "./cline.js";
@@ -17,10 +18,12 @@ const EMITTERS: Record<TargetRuntime, () => Emitter> = {
 	generic: () => new GenericEmitter(),
 };
 
+const VALID_TARGETS = Object.keys(EMITTERS);
+
 export function getEmitter(target: TargetRuntime): Emitter {
 	const factory = EMITTERS[target];
 	if (!factory) {
-		throw new Error(`Unknown emit target: ${target}`);
+		exitWithUnknownEmitTarget(target, VALID_TARGETS);
 	}
 	return factory();
 }

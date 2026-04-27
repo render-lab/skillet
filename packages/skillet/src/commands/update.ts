@@ -6,6 +6,7 @@ import { resolveSkill } from "../resolver/github.js";
 import { buildGraph, type ResolvedSkill } from "../resolver/graph.js";
 import { MANIFEST_FILE, ManifestSchema } from "../schemas/manifest.js";
 import { parseSkillSpec } from "../schemas/skill.js";
+import { exitWithMissingLockfile, exitWithMissingManifest } from "../utils/cli-error.js";
 import { fileExists, readJson } from "../utils/fs.js";
 import { GitError } from "../utils/git.js";
 
@@ -18,8 +19,7 @@ export async function runUpdate(opts: UpdateOptions) {
 	const manifestPath = path.join(cwd, MANIFEST_FILE);
 
 	if (!(await fileExists(manifestPath))) {
-		console.error(pc.red(`No ${MANIFEST_FILE} found. Run "skillet init" first.`));
-		process.exit(1);
+		exitWithMissingManifest("skillet update");
 	}
 
 	const raw = await readJson(manifestPath);
@@ -27,8 +27,7 @@ export async function runUpdate(opts: UpdateOptions) {
 	const lockfile = await readLockfile(cwd);
 
 	if (!lockfile) {
-		console.error(pc.red('No lockfile found. Run "skillet install" first.'));
-		process.exit(1);
+		exitWithMissingLockfile("skillet update");
 	}
 
 	const filterIds = opts.skills && opts.skills.length > 0 ? new Set(opts.skills) : null;

@@ -9,6 +9,11 @@ import { writeBenchmarkJson } from "../report/json-reporter.js";
 import { runOrchestrator } from "../runner/orchestrator.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { type EvalCase, EvalsFileSchema, getTurns } from "../schemas/evals.js";
+import {
+	exitWithMissingEvalsFile,
+	exitWithMissingFile,
+	exitWithMissingSkillFile,
+} from "../utils/cli-error.js";
 import { VERSION } from "../version.js";
 
 export interface RunOpts {
@@ -37,17 +42,13 @@ Use the available tools (bash, read_file, write_file, list_directory) to complet
 
 export async function runRun(opts: RunOpts) {
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
+	const skillArg = opts.skill || ".";
 
 	if (!fs.existsSync(paths.skillFile)) {
-		console.error(pc.red(`SKILL.md not found at ${paths.skillFile}`));
-		process.exit(1);
+		exitWithMissingSkillFile("run", skillArg, paths.skillFile);
 	}
 	if (!fs.existsSync(paths.evalsFile)) {
-		console.error(pc.red(`evals.json not found at ${paths.evalsFile}`));
-		console.error(
-			`\nRun ${pc.bold(`skillet eval generate ${opts.skill}`)} to auto-generate evals from SKILL.md,\nor create evals.json manually.\n`,
-		);
-		process.exit(1);
+		exitWithMissingEvalsFile("run", skillArg, paths.evalsFile, Boolean(opts.evals));
 	}
 
 	const skillContent = fs.readFileSync(paths.skillFile, "utf-8");
@@ -85,6 +86,13 @@ export async function runRun(opts: RunOpts) {
 	writeOutputs(result, config, evalsFile, evals, opts, paths);
 
 	if (opts.golden) {
+		if (!fs.existsSync(opts.golden)) {
+			exitWithMissingFile(
+				"Golden benchmark",
+				opts.golden,
+				`Run ${pc.bold(`skillet eval run ${skillArg}`)} first, then compare against one of the JSON result files.`,
+			);
+		}
 		const goldenRaw = JSON.parse(fs.readFileSync(opts.golden, "utf-8"));
 		const golden = BenchmarkFileSchema.parse(goldenRaw);
 		const results = compareBenchmarks(golden.provider_summary, result.providerSummary);

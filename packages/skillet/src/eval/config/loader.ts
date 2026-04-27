@@ -36,6 +36,12 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 	const configPath = overrides.configPath ?? "skillet.eval.yaml";
 	let fileConfig: Config | undefined;
 
+	if (overrides.configPath && !fs.existsSync(configPath)) {
+		throw new Error(
+			`Config file not found at ${configPath}.\nCheck the --config path, or run "skillet eval init" to scaffold one.`,
+		);
+	}
+
 	if (fs.existsSync(configPath)) {
 		const raw = fs.readFileSync(configPath, "utf-8");
 		const parsed = YAML.parse(raw);

@@ -5,6 +5,7 @@ import { MANIFEST_FILE, ManifestSchema } from "../schemas/manifest.js";
 import { parseSkillSpec } from "../schemas/skill.js";
 import { getCachedSkill } from "../resolver/cache.js";
 import { warnOutdated } from "../resolver/outdated.js";
+import { exitWithMissingManifest, exitWithNoSkillsDeclared } from "../utils/cli-error.js";
 import { fileExists, readJson } from "../utils/fs.js";
 
 export async function runStatus() {
@@ -12,8 +13,7 @@ export async function runStatus() {
 	const manifestPath = path.join(cwd, MANIFEST_FILE);
 
 	if (!(await fileExists(manifestPath))) {
-		console.error(pc.red(`No ${MANIFEST_FILE} found. Run "skillet init" first.`));
-		process.exit(1);
+		exitWithMissingManifest("skillet status");
 	}
 
 	const raw = await readJson(manifestPath);
@@ -23,8 +23,7 @@ export async function runStatus() {
 	const skillEntries = Object.entries(manifest.skills);
 
 	if (skillEntries.length === 0) {
-		console.log(pc.yellow("No skills declared in manifest."));
-		return;
+		exitWithNoSkillsDeclared();
 	}
 
 	console.log(pc.cyan("Skillet Status\n"));

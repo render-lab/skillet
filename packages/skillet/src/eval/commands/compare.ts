@@ -2,6 +2,7 @@ import fs from "node:fs";
 import pc from "picocolors";
 import type { ProviderSummary } from "../schemas/benchmark.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
+import { exitWithMissingFile } from "../utils/cli-error.js";
 import { rateColor } from "../utils/rate.js";
 
 export interface CompareResult {
@@ -57,6 +58,20 @@ function loadBenchmark(filePath: string) {
 }
 
 export function runCompare(goldenPath: string, currentPath: string) {
+	if (!fs.existsSync(goldenPath)) {
+		exitWithMissingFile(
+			"Golden benchmark",
+			goldenPath,
+			`Pass the path to a JSON result file from ${pc.bold(".skillet-evals/results/<skill>/")}.`,
+		);
+	}
+	if (!fs.existsSync(currentPath)) {
+		exitWithMissingFile(
+			"Current benchmark",
+			currentPath,
+			`Pass the path to a JSON result file from ${pc.bold(".skillet-evals/results/<skill>/")}.`,
+		);
+	}
 	const golden = loadBenchmark(goldenPath);
 	const current = loadBenchmark(currentPath);
 	const results = compareBenchmarks(golden.provider_summary, current.provider_summary);

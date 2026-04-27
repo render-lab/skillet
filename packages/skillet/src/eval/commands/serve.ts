@@ -4,6 +4,7 @@ import path from "node:path";
 import pc from "picocolors";
 import { resolveSkillPaths } from "../config.js";
 import { writeDashboard } from "../report/html-reporter.js";
+import { exitWithMissingEvalsFile } from "../utils/cli-error.js";
 
 interface ServeOpts {
 	skill: string;
@@ -22,6 +23,11 @@ export async function runServe(opts: ServeOpts) {
 	const port = Number(opts.port ?? 3000);
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
 	const resultsDir = paths.resultsDir;
+	const skillArg = opts.skill || ".";
+
+	if (opts.evals && !fs.existsSync(paths.evalsFile)) {
+		exitWithMissingEvalsFile("serve", skillArg, paths.evalsFile, true);
+	}
 
 	if (!fs.existsSync(resultsDir)) {
 		fs.mkdirSync(resultsDir, { recursive: true });

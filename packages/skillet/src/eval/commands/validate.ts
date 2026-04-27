@@ -37,7 +37,9 @@ export async function runValidate(opts: ValidateOpts) {
 		const size = fs.statSync(paths.skillFile).size;
 		pass(`SKILL.md found (${(size / 1024).toFixed(1)} KB)`);
 	} else {
-		fail(`SKILL.md not found at ${paths.skillFile}`);
+		fail(
+			`SKILL.md not found at ${paths.skillFile}. Pass the skill directory explicitly if you're not already in it.`,
+		);
 	}
 
 	// evals.json
@@ -51,7 +53,9 @@ export async function runValidate(opts: ValidateOpts) {
 			fail(`evals.json invalid: ${extractErrorMessage(err)}`);
 		}
 	} else {
-		fail(`evals.json not found at ${paths.evalsFile}`);
+		fail(
+			`evals.json not found at ${paths.evalsFile}. Run "skillet eval generate ${opts.skill}" or pass --evals <path>.`,
+		);
 	}
 
 	// Config / providers

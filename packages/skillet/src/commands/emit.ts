@@ -7,6 +7,11 @@ import { MANIFEST_FILE, ManifestSchema, type TargetRuntime } from "../schemas/ma
 import { SkillFrontmatter, parseSkillSpec } from "../schemas/skill.js";
 import { getCachedSkill } from "../resolver/cache.js";
 import { warnOutdated } from "../resolver/outdated.js";
+import {
+	exitWithMissingLockfile,
+	exitWithMissingManifest,
+	exitWithUnknownEmitTarget,
+} from "../utils/cli-error.js";
 import { parseFrontmatter } from "../utils/frontmatter.js";
 import { fileExists, readJson, readText } from "../utils/fs.js";
 
@@ -14,13 +19,22 @@ interface EmitOptions {
 	target?: string;
 }
 
+const VALID_TARGETS = [
+	"cursor",
+	"cursor-legacy",
+	"claude-code",
+	"codex",
+	"windsurf",
+	"cline",
+	"generic",
+] as const;
+
 export async function runEmit(opts: EmitOptions) {
 	const cwd = process.cwd();
 	const manifestPath = path.join(cwd, MANIFEST_FILE);
 
 	if (!(await fileExists(manifestPath))) {
-		console.error(pc.red(`No ${MANIFEST_FILE} found. Run "skillet init" first.`));
-		process.exit(1);
+		exitWithMissingManifest("skillet emit");
 	}
 
 	const raw = await readJson(manifestPath);
@@ -28,13 +42,16 @@ export async function runEmit(opts: EmitOptions) {
 	const lockfile = await readLockfile(cwd);
 
 	if (!lockfile) {
-		console.error(pc.red("No lockfile found. Run \"skillet install\" first."));
-		process.exit(1);
+		exitWithMissingLockfile("skillet emit");
 	}
 
-	const targets: TargetRuntime[] = opts.target
-		? (opts.target.split(",") as TargetRuntime[])
-		: manifest.config.target;
+	const targets = opts.target ? opts.target.split(",").map((target) => target.trim()) : manifest.config.target;
+	for (const target of targets) {
+		if (!VALID_TARGETS.includes(target as (typeof VALID_TARGETS)[number])) {
+			exitWithUnknownEmitTarget(target, [...VALID_TARGETS]);
+		}
+	}
+	const typedTargets = targets as TargetRuntime[];
 
 	const skills = await loadSkillContents(lockfile, manifest);
 
@@ -43,7 +60,7 @@ export async function runEmit(opts: EmitOptions) {
 		return;
 	}
 
-	const emitters = getEmitters(targets);
+	const emitters = getEmitters(typedTargets);
 	const allFiles: string[] = [];
 
 	for (const emitter of emitters) {
@@ -58,7 +75,7 @@ export async function runEmit(opts: EmitOptions) {
 		);
 	}
 
-	console.log(`\n${pc.green(`Emitted ${allFiles.length} file(s) for ${targets.length} target(s).`)}`);
+	console.log(`\n${pc.green(`Emitted ${allFiles.length} file(s) for ${typedTargets.length} target(s).`)}`);
 
 	await warnOutdated(manifest, lockfile);
 }

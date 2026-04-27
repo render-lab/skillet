@@ -7,6 +7,7 @@ import { buildGraph, type ResolvedSkill } from "../resolver/graph.js";
 import { readLockfile } from "../lockfile/read.js";
 import { buildLockfile, writeLockfile } from "../lockfile/write.js";
 import { warnOutdated } from "../resolver/outdated.js";
+import { exitWithMissingManifest, exitWithNoSkillsDeclared } from "../utils/cli-error.js";
 import { fileExists, readJson } from "../utils/fs.js";
 import { GitError } from "../utils/git.js";
 
@@ -15,8 +16,7 @@ export async function runInstall() {
 	const manifestPath = path.join(cwd, MANIFEST_FILE);
 
 	if (!(await fileExists(manifestPath))) {
-		console.error(pc.red(`No ${MANIFEST_FILE} found. Run "skillet init" first.`));
-		process.exit(1);
+		exitWithMissingManifest("skillet install");
 	}
 
 	const raw = await readJson(manifestPath);
@@ -25,8 +25,7 @@ export async function runInstall() {
 
 	const skillEntries = Object.entries(manifest.skills);
 	if (skillEntries.length === 0) {
-		console.log(pc.yellow("No skills declared in manifest. Nothing to install."));
-		return;
+		exitWithNoSkillsDeclared();
 	}
 
 	console.log(pc.cyan(`Installing ${skillEntries.length} skill(s)...\n`));

@@ -7,6 +7,7 @@ import { createProvider } from "../providers/factory.js";
 import { PRICING } from "../providers/pricing.js";
 import { Spinner } from "../runner/spinner.js";
 import { EvalsFileSchema, getTurns } from "../schemas/evals.js";
+import { exitWithMissingSkillFile } from "../utils/cli-error.js";
 import { extractJson } from "../utils/json.js";
 import { exitIfCancelled } from "../utils/prompt.js";
 
@@ -145,10 +146,10 @@ interface GenerateOpts {
 export async function runGenerate(opts: GenerateOpts) {
 	const count = Number(opts.count ?? 3);
 	const paths = resolveSkillPaths(opts.skill);
+	const skillArg = opts.skill || ".";
 
 	if (!fs.existsSync(paths.skillFile)) {
-		console.error(pc.red(`SKILL.md not found at ${paths.skillFile}`));
-		process.exit(1);
+		exitWithMissingSkillFile("generate", skillArg, paths.skillFile);
 	}
 
 	prompts.intro(pc.bold("skillet eval generate"));

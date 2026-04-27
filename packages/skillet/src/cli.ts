@@ -1,5 +1,6 @@
 import path from "node:path";
 import { Command } from "commander";
+import pc from "picocolors";
 import { runAdd } from "./commands/add.js";
 import { runEmit } from "./commands/emit.js";
 import { runInit } from "./commands/init.js";
@@ -19,6 +20,12 @@ import { extractErrorMessage } from "./eval/utils/error.js";
 import { VERSION } from "./version.js";
 
 const program = new Command();
+
+program.showSuggestionAfterError();
+program.showHelpAfterError(`\n${pc.dim("Run the command again with --help for usage.")}`);
+program.configureOutput({
+	outputError: (str, write) => write(pc.red(str)),
+});
 
 function loadEnvForSkill(skill?: string) {
 	const dirs = [process.cwd()];
@@ -79,7 +86,7 @@ evalProgram
 	.description("Auto-generate a starter evals.json from SKILL.md using an LLM")
 	.option("--count <n>", "Number of evals to generate", "3")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill, opts) => {
+	.action((skill = ".", opts) => {
 		loadEnvForSkill(skill);
 		runGenerate({ ...opts, skill });
 	});
@@ -89,7 +96,7 @@ evalProgram
 	.description("Generate fixture files referenced by evals.json using an LLM")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action(async (skill, opts) => {
+	.action(async (skill = ".", opts) => {
 		loadEnvForSkill(skill);
 		await runFixtures({ ...opts, skill });
 	});
@@ -99,7 +106,7 @@ evalProgram
 	.description("Generate evals and fixture files in one step (generate + fixtures)")
 	.option("--count <n>", "Number of evals to generate", "3")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action(async (skill, opts) => {
+	.action(async (skill = ".", opts) => {
 		loadEnvForSkill(skill);
 		await runScaffold({ ...opts, skill });
 	});
@@ -109,7 +116,7 @@ evalProgram
 	.description("Pre-flight checks: verify skill directory, evals, and API keys")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--config <path>", "Path to skillet.eval.yaml")
-	.action((skill, opts) => {
+	.action((skill = ".", opts) => {
 		loadEnvForSkill(skill);
 		runValidate({ ...opts, skill });
 	});
@@ -119,7 +126,7 @@ evalProgram
 	.description("Serve a local dashboard showing eval results history")
 	.option("--evals <path>", "Path to evals.json")
 	.option("--port <n>", "Port to serve on", "3000")
-	.action((skill, opts) => {
+	.action((skill = ".", opts) => {
 		loadEnvForSkill(skill);
 		runServe({ ...opts, skill });
 	});
@@ -137,7 +144,7 @@ evalProgram
 	.option("--timeout <seconds>", "Timeout per eval in seconds", "300")
 	.option("--concurrency <n>", "Max concurrent eval runs (default: all, max 10)")
 	.option("--golden <path>", "Golden benchmark file to compare against for regression")
-	.action(async (skill, opts) => {
+	.action(async (skill = ".", opts) => {
 		loadEnvForSkill(skill);
 		try {
 			await runRun({ ...opts, skill });
