@@ -61,6 +61,12 @@ th { background: var(--border); font-weight: 600; font-size: 0.8rem; text-transf
 .rate-detail { color: var(--muted); font-size: 0.8em; }
 .provider-line { font-size: 0.85rem; margin-bottom: 0.15rem; }
 
+/* Skill filters */
+.filter-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0 1.5rem; }
+.filter-chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 0.4rem 0.8rem; font-size: 0.85rem; cursor: pointer; }
+.filter-chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+.filter-chip:hover { opacity: 0.9; }
+
 /* Buttons */
 .btn { display: inline-block; padding: 0.35rem 0.8rem; border-radius: 4px; background: var(--accent); color: white; text-decoration: none; font-size: 0.8rem; font-weight: 500; margin-right: 0.25rem; border: none; cursor: pointer; }
 .btn-dim { background: var(--border); color: var(--muted); }
@@ -109,6 +115,7 @@ const rateClass = (r) => r >= HIGH_THRESHOLD ? "text-green" : r >= MID_THRESHOLD
 
 let runs = []; // sorted newest-first
 let charts = [];
+let selectedSkill = null;
 
 async function init() {
   try {
@@ -136,26 +143,45 @@ function renderList() {
 
   const latest = runs[0].data;
   const skillName = latest.metadata?.skill_name ?? "Unknown";
-  const latestSummary = latest.provider_summary ?? {};
+  const skillNames = [...new Set(runs.map(r => r.data.metadata?.skill_name ?? "Unknown"))].sort();
+  if (selectedSkill && !skillNames.includes(selectedSkill)) {
+    selectedSkill = null;
+  }
+  const visibleRuns = runs
+    .map((run, idx) => ({ run, idx }))
+    .filter(({ run }) => !selectedSkill || (run.data.metadata?.skill_name ?? "Unknown") === selectedSkill);
+  const latestVisible = visibleRuns[0]?.run.data ?? latest;
+  const latestSummary = latestVisible.provider_summary ?? {};
   const latestPassRates = Object.values(latestSummary).map(s => s.pass_rate?.mean ?? 0);
   const avgLatest = latestPassRates.length ? latestPassRates.reduce((a, b) => a + b, 0) / latestPassRates.length : 0;
 
-  const chartData = runs.slice().reverse().map(r => {
-    const s = r.data.provider_summary ?? {};
+  const chartData = visibleRuns.slice().reverse().map(({ run }) => {
+    const r = run.data;
+    const s = r.provider_summary ?? {};
     const rates = Object.values(s).map(x => x.pass_rate?.mean ?? 0);
     return {
-      label: new Date(r.data.metadata?.timestamp).toLocaleDateString(),
+      label: new Date(r.metadata?.timestamp).toLocaleDateString(),
       value: rates.length ? (rates.reduce((a,b) => a+b, 0) / rates.length * 100) : 0,
     };
   });
 
   let html = '<h1>skillet eval</h1>';
-  html += '<p class="subtitle">' + esc(skillName) + ' — ' + runs.length + ' run(s)</p>';
+  html += '<p class="subtitle">' + esc(selectedSkill ?? (skillNames.length === 1 ? skillName : skillNames.length + ' skills')) + ' — ' + visibleRuns.length + ' run(s)</p>';
+
+  if (skillNames.length > 1) {
+    html += '<div class="filter-bar">';
+    html += '<button class="filter-chip ' + (selectedSkill === null ? 'active' : '') + '" onclick="setSkillFilter(null)">All skills (' + runs.length + ')</button>';
+    for (const name of skillNames) {
+      const count = runs.filter(r => (r.data.metadata?.skill_name ?? "Unknown") === name).length;
+      html += '<button class="filter-chip ' + (selectedSkill === name ? 'active' : '') + '" onclick="setSkillFilter(' + JSON.stringify(name) + ')">' + esc(name) + ' (' + count + ')</button>';
+    }
+    html += '</div>';
+  }
 
   // Top stats
   html += '<div class="top-stats">';
   html += '<div class="stat-card"><div class="stat-value ' + rateClass(avgLatest) + '">' + pct(avgLatest) + '</div><div class="stat-label">Latest pass rate</div></div>';
-  html += '<div class="stat-card"><div class="stat-value">' + runs.length + '</div><div class="stat-label">Total runs</div></div>';
+  html += '<div class="stat-card"><div class="stat-value">' + visibleRuns.length + '</div><div class="stat-label">Visible runs</div></div>';
   html += '<div class="stat-card"><div class="stat-value">' + Object.keys(latestSummary).length + '</div><div class="stat-label">Provider(s) tested</div></div>';
   html += '</div>';
 
@@ -167,8 +193,8 @@ function renderList() {
   // Run table
   html += '<h2>Run History</h2><table><thead><tr><th>Run</th><th class="text-center">Score</th><th>Providers</th><th class="text-center">View</th></tr></thead><tbody>';
 
-  for (let i = 0; i < runs.length; i++) {
-    const r = runs[i].data;
+  for (const entry of visibleRuns) {
+    const r = entry.run.data;
     const meta = r.metadata ?? {};
     const summary = r.provider_summary ?? {};
     const totalRuns = r.runs?.length ?? 0;
@@ -180,13 +206,14 @@ function renderList() {
       '<div class="provider-line"><span class="' + rateClass(v.pass_rate?.mean ?? 0) + '">' + pct(v.pass_rate?.mean ?? 0) + '</span> <span class="muted">' + esc(k) + '</span></div>'
     ).join("");
 
-    const ts = meta.timestamp ? new Date(meta.timestamp).toLocaleString() : runs[i].file;
+    const ts = meta.timestamp ? new Date(meta.timestamp).toLocaleString() : entry.run.file;
+    const runSkillName = meta.skill_name ?? "Unknown";
 
-    html += '<tr class="run-row" onclick="showRun(' + i + ')">';
-    html += '<td><div class="timestamp">' + esc(ts) + '</div><div class="file-name">' + esc(runs[i].file) + '</div></td>';
+    html += '<tr class="run-row" onclick="showRun(' + entry.idx + ')">';
+    html += '<td><div class="timestamp">' + esc(ts) + '</div><div class="file-name">' + esc(runSkillName) + ' · ' + esc(entry.run.file) + '</div></td>';
     html += '<td class="text-center ' + rateClass(passRate) + '"><div class="rate-big">' + pct(passRate) + '</div><div class="rate-detail">' + totalPassed + '/' + totalAssertions + '</div></td>';
     html += '<td>' + providers + '</td>';
-    html += '<td class="text-center"><button class="btn" onclick="event.stopPropagation();showRun(' + i + ')">Details</button> <a class="btn btn-dim" href="/' + esc(runs[i].file) + '" onclick="event.stopPropagation()">JSON</a></td>';
+    html += '<td class="text-center"><button class="btn" onclick="event.stopPropagation();showRun(' + entry.idx + ')">Details</button> <a class="btn btn-dim" href="/' + esc(entry.run.file) + '" onclick="event.stopPropagation()">JSON</a></td>';
     html += '</tr>';
   }
 
@@ -308,6 +335,11 @@ function showRun(idx) {
       }
     }));
   }
+}
+
+function setSkillFilter(skill) {
+  selectedSkill = skill;
+  renderList();
 }
 
 function destroyCharts() {

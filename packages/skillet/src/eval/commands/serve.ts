@@ -2,7 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import pc from "picocolors";
-import { resolveSkillPaths } from "../config.js";
+import { findProjectRoot, resolveSkillPaths } from "../config.js";
 import { writeDashboard } from "../report/html-reporter.js";
 import { exitWithMissingEvalsFile } from "../utils/cli-error.js";
 
@@ -22,8 +22,11 @@ const MIME: Record<string, string> = {
 export async function runServe(opts: ServeOpts) {
 	const port = Number(opts.port ?? 3000);
 	const paths = resolveSkillPaths(opts.skill, opts.evals);
-	const resultsDir = paths.resultsDir;
 	const skillArg = opts.skill || ".";
+	const resultsRoot = path.join(findProjectRoot(paths.skillDir), ".skillet-evals", "results");
+	const shouldServeAllSkills =
+		!opts.evals && !fs.existsSync(paths.skillFile) && fs.existsSync(resultsRoot);
+	const resultsDir = shouldServeAllSkills ? resultsRoot : paths.resultsDir;
 
 	if (opts.evals && !fs.existsSync(paths.evalsFile)) {
 		exitWithMissingEvalsFile("serve", skillArg, paths.evalsFile, true);
@@ -35,12 +38,44 @@ export async function runServe(opts: ServeOpts) {
 
 	writeDashboard(resultsDir);
 
-	let skillName = path.basename(paths.skillDir);
-	try {
-		const raw = JSON.parse(fs.readFileSync(paths.evalsFile, "utf-8"));
-		if (raw.skill_name) skillName = raw.skill_name;
-	} catch {
-		// evals.json may not exist yet; fall back to directory name
+	let skillName = shouldServeAllSkills ? "All skills" : path.basename(paths.skillDir);
+	if (!shouldServeAllSkills) {
+		try {
+			const raw = JSON.parse(fs.readFileSync(paths.evalsFile, "utf-8"));
+			if (raw.skill_name) skillName = raw.skill_name;
+		} catch {
+			// evals.json may not exist yet; fall back to directory name
+		}
+	}
+
+	function listRunFiles(baseDir: string): string[] {
+		if (shouldServeAllSkills) {
+			return fs
+				.readdirSync(baseDir, { withFileTypes: true })
+				.filter((entry) => entry.isDirectory())
+				.flatMap((entry) =>
+					fs
+						.readdirSync(path.join(baseDir, entry.name))
+						.filter((file) => file.endsWith(".json") && file !== "latest.json")
+						.map((file) => `${entry.name}/${file}`),
+				)
+				.sort()
+				.reverse();
+		}
+
+		return fs
+			.readdirSync(baseDir)
+			.filter((f) => f.endsWith(".json") && f !== "latest.json")
+			.sort()
+			.reverse();
+	}
+
+	function resolveRequestedPath(baseDir: string, pathname: string): string | null {
+		const relativePath = pathname.replace(/^\/+/, "");
+		if (!relativePath) return path.join(baseDir, "index.html");
+		const resolvedPath = path.resolve(baseDir, relativePath);
+		if (!resolvedPath.startsWith(path.resolve(baseDir))) return null;
+		return resolvedPath;
 	}
 
 	const server = http.createServer((req, res) => {
@@ -48,11 +83,7 @@ export async function runServe(opts: ServeOpts) {
 		const pathname = url.pathname;
 
 		if (pathname === "/api/runs") {
-			const files = fs
-				.readdirSync(resultsDir)
-				.filter((f) => f.endsWith(".json") && f !== "latest.json")
-				.sort()
-				.reverse();
+			const files = listRunFiles(resultsDir);
 			res.writeHead(200, {
 				"Content-Type": "application/json",
 				"Cache-Control": "no-cache",
@@ -66,8 +97,13 @@ export async function runServe(opts: ServeOpts) {
 			writeDashboard(resultsDir);
 			filePath = path.join(resultsDir, "index.html");
 		} else {
-			const safeName = path.basename(pathname);
-			filePath = path.join(resultsDir, safeName);
+			const resolvedPath = resolveRequestedPath(resultsDir, pathname);
+			if (!resolvedPath) {
+				res.writeHead(404, { "Content-Type": "text/plain" });
+				res.end("Not found");
+				return;
+			}
+			filePath = resolvedPath;
 		}
 
 		if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
