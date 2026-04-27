@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+export const EvalIntegrationScenarioSchema = z.object({
+	state: z.record(z.unknown()).default({}),
+	overrides: z
+		.record(
+			z.object({
+				response: z.unknown().optional(),
+				responseFromState: z.string().optional(),
+			}),
+		)
+		.default({}),
+});
+
 export const EvalCaseSchema = z
 	.object({
 		id: z.number(),
@@ -7,6 +19,7 @@ export const EvalCaseSchema = z
 		turns: z.array(z.string()).min(1).optional(),
 		expected_output: z.string(),
 		files: z.array(z.string()).default([]),
+		integrations: z.record(EvalIntegrationScenarioSchema).default({}),
 		assertions: z.array(z.string()).min(1),
 	})
 	.refine((v) => v.prompt || v.turns, {
@@ -24,6 +37,7 @@ export const EvalsFileSchema = z.object({
 
 export type EvalCase = z.infer<typeof EvalCaseSchema>;
 export type EvalsFile = z.infer<typeof EvalsFileSchema>;
+export type EvalIntegrationScenario = z.infer<typeof EvalIntegrationScenarioSchema>;
 
 /** Normalize to a turns array regardless of whether prompt or turns was used. */
 export function getTurns(evalCase: EvalCase): string[] {

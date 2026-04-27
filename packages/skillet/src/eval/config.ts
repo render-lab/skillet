@@ -17,12 +17,16 @@ export {
 	ProviderConfigSchema,
 	GraderConfigSchema,
 	SkillDiscoveryConfigSchema,
+	MockIntegrationConfigSchema,
+	MockToolConfigSchema,
 	ConfigFileSchema,
 } from "./config/schema.js";
 export type {
 	ProviderConfig,
 	GraderConfig,
 	SkillDiscoveryConfig,
+	MockIntegrationConfig,
+	MockToolConfig,
 	Config,
 	ResolvedConfig,
 	CliOverrides,

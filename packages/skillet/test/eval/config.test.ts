@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -115,6 +115,36 @@ describe("loadConfig", () => {
 			path.join(tmpDir, "skills"),
 			path.resolve(tmpDir, "../shared-skills"),
 		]);
+		expect(config.integrations).toEqual({});
+	});
+
+	it("resolves integration mock sources relative to the config file", async () => {
+		const configPath = path.join(tmpDir, "nested/custom.eval.yaml");
+		await mkdir(path.dirname(configPath), { recursive: true });
+		await writeFile(
+			configPath,
+			[
+				"providers:",
+				"  - name: openai",
+				"    model: gpt-5.4",
+				"    apiKey: ${OPENAI_API_KEY}",
+				"integrations:",
+				"  render:",
+				"    openapi: ./fixtures/openapi.json",
+				"    mcpServer: https://github.com/example/mcp-server",
+				"    expose: [http, tools]",
+				"",
+			].join("\n"),
+		);
+		process.env.OPENAI_API_KEY = "openai-key";
+
+		const config = loadConfig({ configPath });
+
+		expect(config.integrations.render).toMatchObject({
+			openapi: path.join(tmpDir, "nested/fixtures/openapi.json"),
+			mcpServer: "https://github.com/example/mcp-server",
+			expose: ["http", "tools"],
+		});
 	});
 
 	it("lets --model overrides replace detected providers and infer missing provider names", () => {

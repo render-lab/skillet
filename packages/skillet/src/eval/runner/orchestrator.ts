@@ -15,6 +15,7 @@ import { extractErrorMessage } from "../utils/error.js";
 import { mean, sleep, stddev } from "../utils/math.js";
 import { rateColor } from "../utils/rate.js";
 import { runAgentLoop } from "./agent-loop.js";
+import { createIntegrationMockEnvironment } from "./integration-mocks.js";
 import { Spinner } from "./spinner.js";
 import { collectOutputFiles, createToolHandlers, defaultTools, seedSandbox } from "./tools.js";
 import { createTurnChecker } from "./turn-check.js";
@@ -180,9 +181,14 @@ export async function runOrchestrator(
 		const evalTimeoutMs = config.settings.timeout * 1000;
 		const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), "skillet-eval-"));
 		let lastDetail = "starting…";
+		let integrationEnv: Awaited<ReturnType<typeof createIntegrationMockEnvironment>> | undefined;
 
 		try {
 			seedSandbox(sandboxDir, skillDir, entry.evalCase.files);
+			integrationEnv = await createIntegrationMockEnvironment(
+				config.integrations,
+				entry.evalCase.integrations,
+			);
 			const id = taskId(entry);
 			const updateDetail = (detail: string) => {
 				lastDetail = detail;
@@ -195,17 +201,26 @@ export async function runOrchestrator(
 						entry.evalCase.turns ?? (entry.evalCase.prompt ? [entry.evalCase.prompt] : []);
 					const agentRun = await runAgentLoop({
 						provider: entry.provider,
-						system: systemPrompt,
+						system:
+							integrationEnv && integrationEnv.instructions.length > 0
+								? `${systemPrompt}\n\n<integration_mocks>\n${integrationEnv.instructions.join("\n")}\n</integration_mocks>`
+								: systemPrompt,
 						turns,
-						tools: defaultTools,
-						toolHandlers: createToolHandlers(sandboxDir, config.settings.timeout),
+						tools: [...defaultTools, ...(integrationEnv?.tools ?? [])],
+						toolHandlers: {
+							...createToolHandlers(sandboxDir, config.settings.timeout),
+							...(integrationEnv?.handlers ?? {}),
+						},
 						maxSteps: config.settings.maxSteps,
 						temperature: config.settings.temperature,
 						onActivity: updateDetail,
 						checkTurnRelevance: turns.length > 1 ? createTurnChecker(graderProvider) : undefined,
 					});
 
-					const outputFiles = collectOutputFiles(sandboxDir);
+					const outputFiles = [
+						...collectOutputFiles(sandboxDir),
+						...(integrationEnv?.outputFiles() ?? []),
+					];
 
 					updateDetail("grading…");
 					const grading: GradingResult = await withHeartbeat(
@@ -251,6 +266,7 @@ export async function runOrchestrator(
 				() => `${taskLabel(entry)} — ${lastDetail}`,
 			);
 		} finally {
+			await integrationEnv?.cleanup();
 			fs.rmSync(sandboxDir, { recursive: true, force: true });
 		}
 	}

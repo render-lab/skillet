@@ -114,10 +114,30 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 	if (overrides.runs) settings.runsPerProvider = overrides.runs;
 	if (overrides.timeout) settings.timeout = overrides.timeout;
 
+	const integrations = Object.fromEntries(
+		Object.entries(fileConfig?.integrations ?? {}).map(([name, integration]) => {
+			const resolveOne = (value: string) =>
+				/^https?:\/\//i.test(value) ? value : path.resolve(configDir, value);
+			const resolveMaybeMany = (value: string | string[] | undefined) => {
+				if (!value) return undefined;
+				return Array.isArray(value) ? value.map(resolveOne) : resolveOne(value);
+			};
+			return [
+				name,
+				{
+					...integration,
+					openapi: resolveMaybeMany(integration.openapi),
+					mcpServer: resolveMaybeMany(integration.mcpServer),
+				},
+			];
+		}),
+	);
+
 	return {
 		providers: resolved,
 		grader: { ...graderSource, apiKey: graderKey },
 		skillRoots: (fileConfig?.skills.roots ?? []).map((root) => path.resolve(configDir, root)),
 		settings,
+		integrations,
 	};
 }

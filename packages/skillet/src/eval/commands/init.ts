@@ -6,6 +6,12 @@ import YAML from "yaml";
 import { PROVIDER_REGISTRY, suggestSkillRoots } from "../config.js";
 import { exitIfCancelled } from "../utils/prompt.js";
 
+interface InitIntegration {
+	openapi?: string;
+	mcpServer?: string;
+	expose: Array<"http" | "tools">;
+}
+
 export async function runInit() {
 	prompts.intro(pc.bold("skillet eval init"));
 
@@ -88,6 +94,77 @@ export async function runInit() {
 		}),
 	) as string;
 
+	const integrations: Record<string, InitIntegration> = {};
+	const configureIntegrations = exitIfCancelled(
+		await prompts.confirm({
+			message: "Configure integration mocks from OpenAPI or an MCP server repo?",
+			initialValue: false,
+		}),
+	);
+
+	if (configureIntegrations) {
+		let addAnother = true;
+		while (addAnother) {
+			const name = exitIfCancelled(
+				await prompts.text({
+					message: "Integration name",
+					placeholder: "render",
+					validate: (value) => {
+						if (!value.trim()) return "Enter an integration name.";
+						if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(value.trim())) {
+							return "Use letters, numbers, underscores, or dashes.";
+						}
+					},
+				}),
+			) as string;
+
+			const openapi = exitIfCancelled(
+				await prompts.text({
+					message: "OpenAPI spec path or URL (optional)",
+					placeholder: "./fixtures/openapi.json",
+				}),
+			) as string;
+
+			const mcpServer = exitIfCancelled(
+				await prompts.text({
+					message: "MCP server repo/path (optional)",
+					placeholder: "./fixtures/my-mcp-server",
+				}),
+			) as string;
+
+			const expose = exitIfCancelled(
+				await prompts.multiselect({
+					message: "Expose this integration as",
+					options: [
+						{ value: "http", label: "Local mock HTTP API" },
+						{ value: "tools", label: "MCP-style model tools" },
+					],
+					initialValues: ["http", "tools"],
+					required: true,
+				}),
+			) as Array<"http" | "tools">;
+
+			const integration: InitIntegration = { expose };
+			if (openapi.trim()) integration.openapi = openapi.trim();
+			if (mcpServer.trim()) integration.mcpServer = mcpServer.trim();
+
+			if (!integration.openapi && !integration.mcpServer) {
+				prompts.log.warn("No OpenAPI spec or MCP server path provided; skipping integration.");
+			} else {
+				integrations[name.trim()] = integration;
+			}
+
+			addAnother = Boolean(
+				exitIfCancelled(
+					await prompts.confirm({
+						message: "Add another integration mock?",
+						initialValue: false,
+					}),
+				),
+			);
+		}
+	}
+
 	const config = {
 		providers,
 		grader: {
@@ -102,6 +179,7 @@ export async function runInit() {
 				.map((root) => root.trim())
 				.filter(Boolean),
 		},
+		...(Object.keys(integrations).length > 0 ? { integrations } : {}),
 		settings: {
 			maxSteps: 20,
 			timeout: 300,

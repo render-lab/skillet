@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -71,5 +71,88 @@ describe("runGenerate", () => {
 
 		expect(chatMock).not.toHaveBeenCalled();
 		expect(await readFile(path.join(tmpDir, "evals.json"), "utf-8")).toBe('{ "existing": true }\n');
+	});
+
+	it("includes configured integration mock resources in the generation prompt", async () => {
+		const configPath = path.join(tmpDir, "skillet.eval.yaml");
+		const openapiPath = path.join(tmpDir, "fixtures/openapi.json");
+		const mcpToolsDir = path.join(tmpDir, "fixtures/mcp/tools");
+		await mkdir(path.dirname(openapiPath), { recursive: true });
+		await mkdir(mcpToolsDir, { recursive: true });
+		await writeFile(
+			openapiPath,
+			JSON.stringify({
+				openapi: "3.1.0",
+				paths: {
+					"/services/{id}": {
+						get: {
+							operationId: "getService",
+							responses: { "200": { description: "ok" } },
+						},
+					},
+				},
+			}),
+		);
+		await writeFile(
+			path.join(mcpToolsDir, "list_services.json"),
+			JSON.stringify({
+				name: "list_services",
+				description: "List services in the account",
+				arguments: { type: "object", properties: {} },
+			}),
+		);
+		await writeFile(
+			configPath,
+			[
+				"providers:",
+				"  - name: openai",
+				"    model: gpt-5.4",
+				"    apiKey: ${OPENAI_API_KEY}",
+				"integrations:",
+				"  render:",
+				"    openapi: ./fixtures/openapi.json",
+				"    mcpServer: ./fixtures/mcp",
+				"    expose: [http, tools]",
+				"",
+			].join("\n"),
+		);
+		selectMock.mockResolvedValue("generated");
+		chatMock.mockResolvedValue({
+			content: JSON.stringify({
+				skill_name: "skill",
+				models: ["gpt-5.4"],
+				evals: [
+					{
+						id: 1,
+						prompt: "Debug the unhealthy service.",
+						expected_output: "The service is identified.",
+						integrations: {
+							render: {
+								state: { services: [{ id: "svc_123", status: "unhealthy" }] },
+								overrides: {
+									"GET /services/{id}": { responseFromState: "services[id]" },
+									"tool:list_services": { responseFromState: "services" },
+								},
+							},
+						},
+						assertions: ["The agent identifies the service"],
+					},
+				],
+			}),
+			usage: { inputTokens: 1, outputTokens: 1 },
+			stopReason: "end",
+			latencyMs: 1,
+		});
+
+		await runGenerate({ skills: [tmpDir], count: "1", config: configPath });
+
+		const prompt = chatMock.mock.calls[0]?.[0].messages[0]?.content;
+		expect(prompt).toContain("Available Integration Mock Resources");
+		expect(prompt).toContain("### render");
+		expect(prompt).toContain("GET /services/{id}");
+		expect(prompt).toContain("tool:list_services");
+		expect(await readFile(path.join(tmpDir, "evals.generated.json"), "utf-8")).toContain(
+			'"integrations"',
+		);
 	});
 });

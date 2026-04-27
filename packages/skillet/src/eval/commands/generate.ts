@@ -11,6 +11,10 @@ import {
 } from "../config.js";
 import { createProvider } from "../providers/factory.js";
 import { PRICING } from "../providers/pricing.js";
+import {
+	type IntegrationMockSummary,
+	summarizeIntegrationMockSources,
+} from "../runner/integration-mocks.js";
 import { Spinner } from "../runner/spinner.js";
 import { EvalsFileSchema, getTurns } from "../schemas/evals.js";
 import { exitWithMissingSkillFile } from "../utils/cli-error.js";
@@ -32,6 +36,7 @@ Return ONLY valid JSON matching this exact structure (no other text):
       "prompt": "<a realistic user prompt that exercises a key capability>",
       "expected_output": "<description of what correct behavior looks like>",
       "files": [],
+      "integrations": {},
       "assertions": [
         "<specific, verifiable assertion about the agent's behavior>"
       ]
@@ -64,13 +69,17 @@ Guidelines:
 - Use "turns" when the skill involves clarification, follow-up questions, ambiguous requests that need disambiguation, iterative refinement, or any back-and-forth. If the skill would reasonably involve the agent asking the user something before proceeding, model that as a multi-turn eval.
 - When using "turns", the first message is intentionally vague or incomplete so the agent must ask a clarifying question. The second message is the user's reply. You can use 2-4 turns.
 - When using "turns", assertions can reference behavior across turns (e.g., "After the user provides X, the agent does Y")
-- A good eval suite mixes single-turn and multi-turn evals. Use multi-turn whenever the scenario naturally calls for it — don't force everything into a single prompt.`;
+- A good eval suite mixes single-turn and multi-turn evals. Use multi-turn whenever the scenario naturally calls for it — don't force everything into a single prompt.
+- When integration mock resources are provided, use the "integrations" object for evals that need external API or MCP-style tool access. Do not invent integration names, route override keys, or tool override keys. Use only the provided names and keys.
+- Put reusable API/tool source information in config, not in generated evals. Generated evals should include only scenario-specific "state" and "overrides".
+- Use "responseFromState" for route and tool overrides when possible. Examples: "services", "services[id]", "deploys[serviceId]". Use static "response" only for one-off values.`;
 
 function buildGeneratePrompt(
 	skillContent: string,
 	references: Array<{ name: string; content: string }>,
 	count: number,
 	models: string[],
+	integrationSummaries: IntegrationMockSummary[],
 ): string {
 	let prompt = `Generate ${count} eval test cases for the following skill.
 
@@ -83,6 +92,48 @@ ${skillContent}`;
 		for (const ref of references) {
 			prompt += `\n### ${ref.name}\n\n${ref.content}\n`;
 		}
+	}
+
+	if (integrationSummaries.length > 0) {
+		prompt += "\n\n## Available Integration Mock Resources\n";
+		prompt +=
+			"Use these resources only when they help test the skill. Include an `integrations` object in generated eval cases that need them.\n";
+		for (const integration of integrationSummaries) {
+			prompt += `\n### ${integration.name}\n`;
+			if (integration.httpRoutes.length > 0) {
+				prompt += "\nHTTP route override keys:\n";
+				for (const route of integration.httpRoutes.slice(0, 40)) {
+					const params = route.params.length ? ` params: ${route.params.join(", ")}` : "";
+					prompt += `- ${route.key}${params}\n`;
+				}
+			}
+			if (integration.tools.length > 0) {
+				prompt += "\nMCP-style tool override keys:\n";
+				for (const tool of integration.tools.slice(0, 40)) {
+					prompt += `- ${tool.key}: ${tool.description}\n`;
+				}
+			}
+			if (integration.errors.length > 0) {
+				prompt += "\nImport notes:\n";
+				for (const error of integration.errors) {
+					prompt += `- ${error}\n`;
+				}
+			}
+		}
+		prompt += `\nWhen an eval uses an integration, follow this shape:
+
+{
+  "integrations": {
+    "<integration_name>": {
+      "state": {
+        "<collection>": [{ "id": "<id>", "...": "..." }]
+      },
+      "overrides": {
+        "<METHOD /path/{param} or tool:name>": { "responseFromState": "<collection>[<param>]" }
+      }
+    }
+  }
+}`;
 	}
 
 	prompt += `\n\nGenerate exactly ${count} evals that cover the skill's most important capabilities. Each eval should test something different. Use multi-turn "turns" for any eval where the user's request is ambiguous, incomplete, or where the agent should ask for clarification before proceeding. Use single-turn "prompt" for straightforward tasks.`;
@@ -179,12 +230,18 @@ export async function runGenerate(opts: GenerateOpts) {
 	);
 
 	const provider = createProvider(config.providers[0]);
+	const integrationSummaries = await summarizeIntegrationMockSources(config.integrations);
 
 	prompts.log.info(`Generator: ${pc.bold(provider.modelId)}`);
 	prompts.log.info(`Models: ${pc.bold(models.join(", "))}`);
 	prompts.log.info(`Count: ${pc.bold(String(finalCount))} eval(s)`);
 	if (skills.length > 1) {
 		prompts.log.info(`Skills: ${pc.bold(String(skills.length))} total`);
+	}
+	if (integrationSummaries.length > 0) {
+		prompts.log.info(
+			`Integration mocks: ${pc.bold(integrationSummaries.map((i) => i.name).join(", "))}`,
+		);
 	}
 
 	for (const [index, skill] of skills.entries()) {
@@ -194,6 +251,7 @@ export async function runGenerate(opts: GenerateOpts) {
 			models,
 			count: finalCount,
 			provider,
+			integrationSummaries,
 			progress: { index: index + 1, total: skills.length },
 		});
 	}
@@ -206,6 +264,7 @@ async function runGenerateForSkill(opts: {
 	models: string[];
 	count: number;
 	provider: ReturnType<typeof createProvider>;
+	integrationSummaries: IntegrationMockSummary[];
 	progress: { index: number; total: number };
 }) {
 	const paths = resolveSkillPaths(opts.skill);
@@ -266,7 +325,13 @@ async function runGenerateForSkill(opts: {
 	const spinner = new Spinner();
 	spinner.start(`Generating ${opts.count} eval(s) with ${opts.provider.modelId}`);
 
-	const prompt = buildGeneratePrompt(skillContent, references, opts.count, opts.models);
+	const prompt = buildGeneratePrompt(
+		skillContent,
+		references,
+		opts.count,
+		opts.models,
+		opts.integrationSummaries,
+	);
 
 	const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [
 		{ role: "user", content: prompt },
