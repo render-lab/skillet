@@ -99,6 +99,8 @@ This gives you a benchmark history for each skill. You can use it to compare pro
 
 Run `skillet eval init` once per project to create `skillet.eval.yaml`. That file configures providers, grader settings, and the local skill roots that `skillet eval` uses to discover skills by default.
 
+`skillet eval init` can also scaffold `.github/workflows/skillet-evals.yml`. The workflow validates eval definitions, runs model evals, writes a GitHub Actions job summary, comments on pull requests, and uploads raw `.skillet-evals/results` artifacts.
+
 ### Eval definitions
 
 Each skill can include an `evals.json` file with test cases:

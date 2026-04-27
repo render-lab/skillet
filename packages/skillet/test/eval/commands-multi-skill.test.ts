@@ -211,6 +211,40 @@ describe("multi-skill eval commands", () => {
 		expect(runOrchestratorMock).toHaveBeenCalledTimes(2);
 	});
 
+	it("skips discovered skills without evals.json when running all configured skills", async () => {
+		const skillA = await createSkill(tmpDir, "fixtures/skills/skill-a");
+		const skillWithoutEvals = path.join(tmpDir, "fixtures/skills/skill-without-evals");
+		await mkdir(skillWithoutEvals, { recursive: true });
+		await writeFile(path.join(skillWithoutEvals, "SKILL.md"), "# skill-without-evals\n");
+		const configPath = path.join(tmpDir, "skillet.eval.yaml");
+		await writeFile(
+			configPath,
+			[
+				"providers:",
+				"  - name: openai",
+				"    model: gpt-5.4",
+				"    apiKey: ${OPENAI_API_KEY}",
+				"skills:",
+				"  roots:",
+				"    - ./fixtures/skills",
+				"",
+			].join("\n"),
+		);
+
+		await runRun({
+			config: configPath,
+			runs: "1",
+			timeout: "5",
+		});
+
+		const logs = vi.mocked(console.log).mock.calls.flat().join("\n");
+		expect(logs).toContain(`Skill: ${skillA}`);
+		expect(logs).toContain(`Skill: ${skillWithoutEvals}`);
+		expect(logs).toContain("Skipped: evals.json not found");
+		expect(logs).toContain("Skipped:    1");
+		expect(runOrchestratorMock).toHaveBeenCalledTimes(1);
+	});
+
 	it("continues across skills and exits once if any run fails", async () => {
 		const skillA = await createSkill(tmpDir, "skill-a");
 		const missingSkill = path.join(tmpDir, "skill-missing");

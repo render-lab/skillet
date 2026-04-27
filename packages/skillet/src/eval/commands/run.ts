@@ -64,6 +64,7 @@ export async function runRun(opts: RunOpts) {
 	let hadError = false;
 	let succeededSkills = 0;
 	let failedSkills = 0;
+	let skippedSkills = 0;
 	let totalEvalCases = 0;
 	let totalEvalRuns = 0;
 
@@ -91,6 +92,13 @@ export async function runRun(opts: RunOpts) {
 		}
 
 		try {
+			const paths = resolveSkillPaths(skill, opts.evals);
+			if (multipleSkills && fs.existsSync(paths.skillFile) && !fs.existsSync(paths.evalsFile)) {
+				skippedSkills++;
+				console.log(`  ${pc.yellow("↷")} Skipped: evals.json not found`);
+				continue;
+			}
+
 			const summary = await runSingleSkill({
 				...opts,
 				skill,
@@ -110,6 +118,7 @@ export async function runRun(opts: RunOpts) {
 		console.log(pc.bold("\nMulti-skill summary\n"));
 		console.log(`  Skills:     ${skills.length} total`);
 		console.log(`  Succeeded:  ${succeededSkills}`);
+		console.log(`  Skipped:    ${skippedSkills}`);
 		console.log(`  Failed:     ${failedSkills}`);
 		console.log(`  Evals:      ${totalEvalCases} across successful skills`);
 		console.log(`  Runs:       ${totalEvalRuns} total eval run(s)`);
