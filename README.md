@@ -12,19 +12,26 @@
 > [!IMPORTANT]
 > **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
 
-Skillet helps teams manage AI agent skills with reproducible installs and runtime-specific context emission. It also includes an eval toolkit for skill authors and maintainers.
+Skillet helps teams build, test, and ship AI agent skills. It combines two workflows:
 
-AI agents work best when you give them explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, emit runtime-specific context, and benchmark how well a model follows those instructions.
+- An eval toolkit for skill authors: generate evals, run real agent loops across model providers, mock external APIs and MCP tools, and compare results over time.
+- A package-management flow for skill consumers: declare dependencies, lock versions, install skills reproducibly, and emit runtime-specific context files.
+
+AI agents work best when you give them explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet helps you measure whether those instructions work before you distribute them, then helps downstream projects install and update them safely.
 
 ## Install the CLI
 
-Install the current release from GitHub:
+Install the current release from npm:
 
 ```bash
-pnpm add -D "https://github.com/render-lab/skillet/releases/download/v0.1.4/render-lab-skillet-0.1.4.tgz"
+pnpm add -D @render-lab/skillet
 ```
 
-To install a different release, replace both instances of `0.1.4` in the URL with the version you want.
+You can also install the latest GitHub release tarball:
+
+```bash
+pnpm add -D "https://github.com/render-lab/skillet/releases/latest/download/render-lab-skillet-latest.tgz"
+```
 
 The packaged CLI installs the `skillet` binary, so you still run commands like `skillet init` and `skillet eval serve`.
 
@@ -32,10 +39,10 @@ The packaged CLI installs the `skillet` binary, so you still run commands like `
 
 Skillet exposes a single CLI:
 
-- `skillet ...` for teams consuming skills in a project
 - `skillet eval ...` for authors evaluating and improving skills
+- `skillet ...` for teams consuming skills in a project
 
-Use `skillet` when you want to declare skill dependencies, install them, and emit them for an agent runtime. Use `skillet eval` when you maintain a set of local skills and want to generate eval cases, validate them, and measure how well a model follows them.
+Use `skillet eval` when you maintain local skills and want evidence that they work: generated test cases, provider comparisons, result history, and CI summaries. Use `skillet` when you want to declare skill dependencies, install them, and emit them for an agent runtime.
 
 ## How skills work
 
@@ -61,78 +68,34 @@ Be thorough but concise. Focus on actionable findings, not nitpicks.
 
 Skills live in GitHub repositories at paths like `owner/repo/skills/my-skill`. You reference them with specifiers like `owner/repo/skills/my-skill@^1.0.0`.
 
-## Using skills in a project
+## How Skillet relates to the Agent Skills spec and `skills.sh`
 
-Running `skillet init` creates a `skills.json` manifest in your project:
+The Agent Skills spec defines the skill format: a skill directory, a `SKILL.md` file, metadata, and instructions that an agent can load. `skills.sh` builds on that spec as a discovery and distribution layer for published skills.
 
-```json
-{
-  "name": "my-project",
-  "version": "1.0.0",
-  "skills": {
-    "R4ph-t/opinionated-vibe-coding/skills/ovc-audit": "2.0",
-    "R4ph-t/opinionated-vibe-coding/skills/ovc-api-review": "latest"
-  },
-  "config": {
-    "target": ["cursor", "claude-code"],
-    "inject": "eager"
-  }
-}
-```
+Skillet builds on spec-compatible skills. It does not replace the skill format or discovery ecosystem. Instead, it adds the project and maintainer workflows you need around them:
 
-Each entry in `skills` maps a GitHub skill path to a version range. The `config` block declares which agent runtimes to target and how context is injected.
+- **Evaluate skills before shipping them.** `skillet eval` runs real agent loops against local skills, grades transcripts with an LLM judge, records result history, and can publish CI summaries to pull requests.
+- **Mock external systems during evals.** Integration mocks let you generate deterministic API and MCP-style tool surfaces from OpenAPI specs and MCP server repos.
+- **Install skills reproducibly.** `skillet install` resolves declared skill dependencies and writes `skills.lock` with content hashes.
+- **Update intentionally.** `skillet update` refreshes dependencies when you ask it to, instead of silently changing installed skill content.
+- **Emit for multiple runtimes.** `skillet emit` writes installed skills for Cursor, Claude Code, Codex, Windsurf, Cline, or a generic agent context file.
 
-### Core commands
-
-```bash
-skillet init
-skillet add owner/repo/skills/my-skill@^1.0
-skillet install
-skillet emit --target cursor
-skillet update
-skillet status
-```
-
-### Lockfile
-
-`skillet install` writes a `skills.lock` file that pins every skill by SHA256 content hash. This ensures reproducible installs across machines and CI environments, regardless of upstream changes.
-
-If some skills fail to resolve during `skillet install`, Skillet preserves their previously locked entries instead of dropping them from the lockfile.
-
-### Injection strategies
-
-The `inject` config controls how skill context is loaded by the agent:
-
-- **`eager`**: All skill content is included in the system prompt upfront.
-- **`lazy`**: Skills are referenced by name and loaded only when the agent needs them.
-- **`tiered`**: A mix of both, based on per-skill overrides.
-
-### Emit targets
-
-`skillet emit` generates runtime-specific context files. Supported targets:
-
-| Target | Output |
-| --- | --- |
-| `cursor` | `.cursor/rules/*.mdc` |
-| `cursor-legacy` | `.cursorrules` |
-| `claude-code` | `CLAUDE.md` |
-| `codex` | `.agents/skills/*/SKILL.md` |
-| `windsurf` | `.windsurfrules` |
-| `cline` | `.clinerules` |
-| `generic` | `agent-context.md` |
-
-### Typical consumer flow
-
-```bash
-skillet init
-skillet add owner/repo/skills/my-skill@^1.0
-skillet install
-skillet emit --target cursor
-```
+In short: the Agent Skills spec defines the format, `skills.sh` helps with discovery and distribution, and Skillet adds the eval, install, update, lockfile, and runtime emission workflow for projects that use those skills.
 
 ## Evaluating a skill
 
-`skillet eval` is for skill authors and maintainers. It measures how well an agent follows a skill's instructions. It runs an actual agent loop, with tool calls for bash and file I/O, inside a sandboxed temp directory and grades the resulting transcript with an LLM judge.
+`skillet eval` is for skill authors and maintainers. It measures how well an agent follows a skill's instructions before you publish those instructions or depend on them in another project.
+
+An eval run uses the same ingredients an agent uses in practice:
+
+- the skill's `SKILL.md` instructions
+- realistic single-turn or multi-turn user prompts
+- sandboxed tools for shell and file operations
+- optional integration mocks for external APIs and MCP-style tools
+- one or more model providers
+- an LLM judge that grades the transcript against explicit assertions
+
+This gives you a benchmark history for each skill. You can use it to compare providers, catch regressions when you edit a skill, and publish results in CI.
 
 Run `skillet eval init` once per project to create `skillet.eval.yaml`. That file configures providers, grader settings, and the local skill roots that `skillet eval` uses to discover skills by default.
 
@@ -360,6 +323,75 @@ skillet eval run
 skillet eval serve
 ```
 
+## Using skills in a project
+
+Running `skillet init` creates a `skills.json` manifest in your project:
+
+```json
+{
+  "name": "my-project",
+  "version": "1.0.0",
+  "skills": {
+    "R4ph-t/opinionated-vibe-coding/skills/ovc-audit": "2.0",
+    "R4ph-t/opinionated-vibe-coding/skills/ovc-api-review": "latest"
+  },
+  "config": {
+    "target": ["cursor", "claude-code"],
+    "inject": "eager"
+  }
+}
+```
+
+Each entry in `skills` maps a GitHub skill path to a version range. The `config` block declares which agent runtimes to target and how context is injected.
+
+### Core commands
+
+```bash
+skillet init
+skillet add owner/repo/skills/my-skill@^1.0
+skillet install
+skillet emit --target cursor
+skillet update
+skillet status
+```
+
+### Lockfile
+
+`skillet install` writes a `skills.lock` file that pins every skill by SHA256 content hash. This ensures reproducible installs across machines and CI environments, regardless of upstream changes.
+
+If some skills fail to resolve during `skillet install`, Skillet preserves their previously locked entries instead of dropping them from the lockfile.
+
+### Injection strategies
+
+The `inject` config controls how skill context is loaded by the agent:
+
+- **`eager`**: All skill content is included in the system prompt upfront.
+- **`lazy`**: Skills are referenced by name and loaded only when the agent needs them.
+- **`tiered`**: A mix of both, based on per-skill overrides.
+
+### Emit targets
+
+`skillet emit` generates runtime-specific context files. Supported targets:
+
+| Target | Output |
+| --- | --- |
+| `cursor` | `.cursor/rules/*.mdc` |
+| `cursor-legacy` | `.cursorrules` |
+| `claude-code` | `CLAUDE.md` |
+| `codex` | `.agents/skills/*/SKILL.md` |
+| `windsurf` | `.windsurfrules` |
+| `cline` | `.clinerules` |
+| `generic` | `agent-context.md` |
+
+### Typical consumer flow
+
+```bash
+skillet init
+skillet add owner/repo/skills/my-skill@^1.0
+skillet install
+skillet emit --target cursor
+```
+
 The TypeScript implementation lives in `packages/skillet/`, with eval internals under `src/eval/`. A Python reference implementation lives in `packages/skillet-eval-python/`.
 
 ## Project structure
@@ -415,8 +447,20 @@ The release workflow runs when you push a tag that matches `v*`.
 1. Update `packages/skillet/package.json` to the version you want to release.
 2. Push the release commit to `main`.
 3. Run `pnpm release:tag` to create and push `v<version>` to `origin`.
-4. Wait for GitHub Actions to create the GitHub release, run verification, and upload the package tarball.
-5. Install that release in another project with:
+4. Wait for GitHub Actions to create the GitHub release, run verification, upload both `render-lab-skillet-<version>.tgz` and `render-lab-skillet-latest.tgz`, and publish `@render-lab/skillet` to npm.
+5. Install the latest release in another project with:
+
+```bash
+pnpm add -D @render-lab/skillet
+```
+
+To install from the latest GitHub release tarball instead, use:
+
+```bash
+pnpm add -D "https://github.com/render-lab/skillet/releases/latest/download/render-lab-skillet-latest.tgz"
+```
+
+To pin a specific release, use:
 
 ```bash
 pnpm add -D "https://github.com/render-lab/skillet/releases/download/v<version>/render-lab-skillet-<version>.tgz"

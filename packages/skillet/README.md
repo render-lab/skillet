@@ -1,14 +1,27 @@
 # skillet
 
-Toolkit for AI agent skills. Manage reproducible skill dependencies, emit runtime-specific context, and evaluate skills across model providers from one CLI.
+Toolkit for evaluating AI agent skills across model providers. Also includes utilities for reproducible skill installs and runtime-specific context emission.
 
 ## Install
 
 ```bash
-npm install -g skillet
+pnpm add -D @render-lab/skillet
 ```
 
 Requires Node.js 20+.
+
+## Eval commands
+
+```bash
+skillet eval init
+skillet eval generate ./my-skill
+skillet eval validate ./my-skill
+skillet eval run ./my-skill
+skillet eval serve ./my-skill
+skillet eval compare golden.json current.json
+```
+
+`skillet eval` runs a sandboxed agent loop against a skill directory, grades the result with an LLM judge, reads config from `skillet.eval.yaml` by default, and writes results to `.skillet-evals/results/<skill-name>/`.
 
 ## Core commands
 
@@ -56,19 +69,6 @@ skillet emit --target claude-code,codex
 ### `skillet status`
 
 Show installed skills, versions, lockfile state, and any stored eval metadata.
-
-## Eval commands
-
-```bash
-skillet eval init
-skillet eval generate ./my-skill
-skillet eval validate ./my-skill
-skillet eval run ./my-skill
-skillet eval serve ./my-skill
-skillet eval compare golden.json current.json
-```
-
-`skillet eval` runs a sandboxed agent loop against a skill directory, grades the result with an LLM judge, reads config from `skillet.eval.yaml` by default, and writes results to `.skillet-evals/results/<skill-name>/`.
 
 ### Integration Mocks
 

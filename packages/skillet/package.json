@@ -9,6 +9,9 @@
 	"bin": {
 		"skillet": "./dist/cli.cjs"
 	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"prepare": "npm run build",
 		"prepack": "npm run build",

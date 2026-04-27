@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   pack:
@@ -28,6 +29,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -47,6 +49,9 @@ jobs:
       - name: Pack CLI package
         run: pnpm pack --filter ./packages/skillet
 
+      - name: Create latest tarball alias
+        run: cp ./*.tgz render-lab-skillet-latest.tgz
+
       - name: Create GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -61,3 +66,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$TAG_NAME" ./*.tgz --clobber
+
+      - name: Publish package to npm
+        working-directory: packages/skillet
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "@render-lab/skillet@$VERSION" version >/dev/null 2>&1; then
+            echo "@render-lab/skillet@$VERSION is already published; skipping npm publish."
+          else
+            npm publish --access public --provenance
+          fi
