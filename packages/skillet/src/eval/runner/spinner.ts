@@ -2,12 +2,41 @@ import pc from "picocolors";
 import { truncate } from "../utils/string.js";
 
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const ANSI_PATTERN =
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: matches ANSI escape sequences
+	/\u001B\[[0-9;?]*[ -/]*[@-~]/g;
 
 function elapsed(ms: number): string {
 	const s = Math.floor(ms / 1000);
 	if (s < 60) return `${s}s`;
 	const m = Math.floor(s / 60);
 	return `${m}m${s % 60}s`;
+}
+
+function stripAnsi(text: string): string {
+	return text.replace(ANSI_PATTERN, "");
+}
+
+function terminalColumns(): number {
+	return Math.max(process.stdout.columns ?? 80, 20);
+}
+
+function wrappedRows(text: string): number {
+	const columns = terminalColumns();
+	return Math.max(
+		1,
+		text.split("\n").reduce((sum, line) => {
+			const visibleLength = stripAnsi(line).length;
+			return sum + Math.max(1, Math.ceil(Math.max(visibleLength, 1) / columns));
+		}, 0),
+	);
+}
+
+function fitLine(text: string): string {
+	const columns = terminalColumns();
+	const plain = stripAnsi(text);
+	if (plain.length <= columns) return text;
+	return `${plain.slice(0, Math.max(columns - 1, 1))}…`;
 }
 
 interface ActiveTask {
@@ -97,20 +126,22 @@ export class Spinner {
 		const time = pc.yellow(elapsed(Date.now() - this.globalStart));
 
 		if (this.simpleMessage) {
-			const spinnerLine = `  ${frame} ${this.simpleMessage} ${pc.dim("(")}${time}${pc.dim(")")}`;
+			const spinnerLine = fitLine(
+				`  ${frame} ${this.simpleMessage} ${pc.dim("(")}${time}${pc.dim(")")}`,
+			);
 			process.stdout.write(spinnerLine);
-			this.lines = 1;
+			this.lines = wrappedRows(spinnerLine);
 			return;
 		}
 
 		const running = this.active.size;
 		const status = `[${this.completed}/${this.total}] ${running} running`;
-		const spinnerLine = `  ${frame} ${status} ${pc.dim("(")}${time}${pc.dim(")")}`;
+		const spinnerLine = fitLine(`  ${frame} ${status} ${pc.dim("(")}${time}${pc.dim(")")}`);
 
 		const tasks = Array.from(this.active.values());
 		if (tasks.length === 0) {
 			process.stdout.write(spinnerLine);
-			this.lines = 1;
+			this.lines = wrappedRows(spinnerLine);
 			return;
 		}
 
@@ -118,15 +149,16 @@ export class Spinner {
 		const detailLines = shown.map((t) => {
 			const taskTime = pc.dim(elapsed(Date.now() - t.startTime));
 			const detail = t.detail ? ` ${pc.dim("·")} ${pc.dim(truncate(t.detail, 60))}` : "";
-			return `    ${pc.dim("↳")} ${truncate(t.label, 40)} ${taskTime}${detail}`;
+			return fitLine(`    ${pc.dim("↳")} ${truncate(t.label, 40)} ${taskTime}${detail}`);
 		});
 
 		if (tasks.length > 3) {
-			detailLines.push(`    ${pc.dim(`  +${tasks.length - 3} more`)}`);
+			detailLines.push(fitLine(`    ${pc.dim(`  +${tasks.length - 3} more`)}`));
 		}
 
-		process.stdout.write(`${spinnerLine}\n${detailLines.join("\n")}`);
-		this.lines = 1 + detailLines.length;
+		const block = `${spinnerLine}\n${detailLines.join("\n")}`;
+		process.stdout.write(block);
+		this.lines = wrappedRows(block);
 	}
 
 	private clearLines() {

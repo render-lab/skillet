@@ -1,6 +1,6 @@
 # Skillet
 
-[![npm version](https://img.shields.io/npm/v/skillet)](https://www.npmjs.com/package/skillet)
+[![GitHub release](https://img.shields.io/github/v/release/render-lab/skillet)](https://github.com/render-lab/skillet/releases)
 [![Node.js 20+](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Experimental](https://img.shields.io/badge/status-experimental-orange)
@@ -15,6 +15,18 @@
 Skillet helps teams manage AI agent skills with reproducible installs and runtime-specific context emission. It also includes an eval toolkit for skill authors and maintainers.
 
 AI agents work best when you give them explicit instructions for specialized tasks. A **skill** is a reusable, versioned module that teaches an agent a specific behavior: how to review code, how to debug programs, how to transform data. Skillet manages skills the way `npm` manages packages: declare dependencies, lock versions, emit runtime-specific context, and benchmark how well a model follows those instructions.
+
+## Install the CLI
+
+Install the current release from GitHub:
+
+```bash
+pnpm add -D "https://github.com/render-lab/skillet/releases/download/v0.1.4/render-lab-skillet-0.1.4.tgz"
+```
+
+To install a different release, replace both instances of `0.1.4` in the URL with the version you want.
+
+The packaged CLI installs the `skillet` binary, so you still run commands like `skillet init` and `skillet eval serve`.
 
 ## One CLI, two workflows
 
@@ -228,6 +240,11 @@ The release workflow runs when you push a tag that matches `v*`.
 2. Push the release commit to `main`.
 3. Run `pnpm release:tag` to create and push `v<version>` to `origin`.
 4. Wait for GitHub Actions to create the GitHub release, run verification, and upload the package tarball.
+5. Install that release in another project with:
+
+```bash
+pnpm add -D "https://github.com/render-lab/skillet/releases/download/v<version>/render-lab-skillet-<version>.tgz"
+```
 
 If you need to push a different tag explicitly, run `pnpm release:tag 0.1.4` or `pnpm release:tag v0.1.4`.
 

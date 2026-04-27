@@ -1,5 +1,5 @@
 {
-	"name": "skillet",
+	"name": "@render-lab/skillet",
 	"version": "0.1.4",
 	"description": "Toolkit for AI agent skills — package management, context emission, and evaluation",
 	"type": "module",
