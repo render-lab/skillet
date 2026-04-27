@@ -28,6 +28,15 @@ function runGit(args, options = {}) {
 	return typeof output === "string" ? output.trim() : "";
 }
 
+function runPnpm(args, options = {}) {
+	execFileSync("pnpm", args, {
+		cwd: repoRoot,
+		encoding: "utf8",
+		stdio: "inherit",
+		...options,
+	});
+}
+
 function gitRefExists(ref) {
 	try {
 		runGit(["rev-parse", "-q", "--verify", ref], { stdio: ["inherit", "pipe", "ignore"] });
@@ -59,6 +68,12 @@ try {
 	const packageVersion = readPackageVersion();
 	const resolvedVersion = arg ?? packageVersion;
 	const tag = resolvedVersion.startsWith("v") ? resolvedVersion : `v${resolvedVersion}`;
+
+	console.log("Running release preflight checks...");
+	runPnpm(["check"]);
+	runPnpm(["typecheck"]);
+	runPnpm(["test"]);
+	runPnpm(["--dir", "packages/skillet", "build"]);
 
 	const dirty = runGit(["status", "--porcelain"]);
 	if (dirty.length > 0) {
