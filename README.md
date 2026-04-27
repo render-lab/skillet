@@ -1,5 +1,8 @@
 # Skillet
 
+![Cooking up tasty skills!](assets/skillet.png)
+*Cooking up tasty skills!*
+
 > [!IMPORTANT]
 > **Skillet is experimental.** APIs, CLIs, and on-disk formats may change without notice.
 
