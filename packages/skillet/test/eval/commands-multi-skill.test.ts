@@ -125,19 +125,15 @@ describe("multi-skill eval commands", () => {
 		await mkdir(skillB, { recursive: true });
 		await writeFile(path.join(skillB, "SKILL.md"), "# skill-b\n");
 
-		const exitSpy = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
-			throw new Error(`exit:${code}`);
-		}) as never);
+		await runValidate({ skills: [skillA, skillB] });
 
-		await expect(runValidate({ skills: [skillA, skillB] })).rejects.toThrow("exit:1");
-
-		expect(exitSpy).toHaveBeenCalledWith(1);
 		const logs = vi.mocked(console.log).mock.calls.flat().join("\n");
 		expect(logs).toContain("Validating 2 skill(s)");
 		expect(logs).toContain(`[1/2] Skill: ${skillA}`);
 		expect(logs).toContain(`[2/2] Skill: ${skillB}`);
 		expect(logs).toContain("evals.json valid");
-		expect(logs).toContain("evals.json not found");
+		expect(logs).toContain("Skipped: evals.json not found");
+		expect(logs).toContain("1 skill(s) skipped because evals.json was not found.");
 	});
 
 	it("runs evals for each provided skill and writes separate result folders", async () => {
@@ -155,7 +151,9 @@ describe("multi-skill eval commands", () => {
 		expect(runOrchestratorMock.mock.calls[1]?.[2]).toBe(skillB);
 		const logs = vi.mocked(console.log).mock.calls.flat().join("\n");
 		expect(logs).toContain("Multi-skill eval run");
-		expect(logs).toContain("Skills:    2");
+		expect(logs).toContain("Selected:  2 skill(s)");
+		expect(logs).toContain("Runnable:  2 skill(s) with evals.json");
+		expect(logs).toContain("Skipped:   0 skill(s) without evals.json");
 		expect(logs).toContain(`[1/2] Skill: ${skillA}`);
 		expect(logs).toContain(`[2/2] Skill: ${skillB}`);
 		expect(logs).toContain("Multi-skill summary");
@@ -241,6 +239,7 @@ describe("multi-skill eval commands", () => {
 		expect(logs).toContain(`Skill: ${skillA}`);
 		expect(logs).toContain(`Skill: ${skillWithoutEvals}`);
 		expect(logs).toContain("Skipped: evals.json not found");
+		expect(logs).toContain("Runnable:  1 skill(s) with evals.json");
 		expect(logs).toContain("Skipped:    1");
 		expect(runOrchestratorMock).toHaveBeenCalledTimes(1);
 	});

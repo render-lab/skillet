@@ -39,6 +39,12 @@ export interface RunOpts {
 	golden?: string;
 }
 
+interface SkillRunCandidate {
+	skill: string;
+	paths: ReturnType<typeof resolveSkillPaths>;
+	skipReason?: string;
+}
+
 export function buildSystemPrompt(skillContent: string): string {
 	return `You are an AI assistant with access to tools. Follow the skill instructions below to complete the user's task.
 
@@ -75,14 +81,27 @@ export async function runRun(opts: RunOpts) {
 		throw new Error("--golden can only be used when running a single skill.");
 	}
 
+	const candidates: SkillRunCandidate[] = skills.map((skill) => {
+		const paths = resolveSkillPaths(skill, opts.evals);
+		if (multipleSkills && fs.existsSync(paths.skillFile) && !fs.existsSync(paths.evalsFile)) {
+			return { skill, paths, skipReason: "evals.json not found" };
+		}
+		return { skill, paths };
+	});
+	const runnableTotal = candidates.filter((candidate) => !candidate.skipReason).length;
+	const initiallySkipped = candidates.length - runnableTotal;
+
 	if (multipleSkills) {
 		console.log(pc.bold("\nMulti-skill eval run\n"));
-		console.log(`  Skills:    ${skills.length}`);
-		console.log("  Scope:     all selected skills");
+		console.log(`  Selected:  ${skills.length} skill(s)`);
+		console.log(`  Runnable:  ${runnableTotal} skill(s) with evals.json`);
+		console.log(`  Skipped:   ${initiallySkipped} skill(s) without evals.json`);
 		console.log("");
 	}
 
-	for (const [index, skill] of skills.entries()) {
+	let runnableIndex = 0;
+	for (const [index, candidate] of candidates.entries()) {
+		const { skill } = candidate;
 		if (multipleSkills && index > 0) {
 			console.log("");
 		}
@@ -92,17 +111,17 @@ export async function runRun(opts: RunOpts) {
 		}
 
 		try {
-			const paths = resolveSkillPaths(skill, opts.evals);
-			if (multipleSkills && fs.existsSync(paths.skillFile) && !fs.existsSync(paths.evalsFile)) {
+			if (candidate.skipReason) {
 				skippedSkills++;
-				console.log(`  ${pc.yellow("↷")} Skipped: evals.json not found`);
+				console.log(`  ${pc.yellow("↷")} Skipped: ${candidate.skipReason}`);
 				continue;
 			}
 
+			runnableIndex++;
 			const summary = await runSingleSkill({
 				...opts,
 				skill,
-				overall: { skillIndex: index + 1, skillTotal: skills.length },
+				overall: { skillIndex: runnableIndex, skillTotal: runnableTotal },
 			});
 			succeededSkills++;
 			totalEvalCases += summary.evalCount;

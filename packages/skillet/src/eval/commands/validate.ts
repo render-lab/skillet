@@ -33,6 +33,8 @@ export async function runValidate(opts: ValidateOpts) {
 		console.log(`Validating ${skills.length} skill(s)\n`);
 	}
 
+	let skipped = 0;
+
 	for (const [index, skill] of skills.entries()) {
 		if (multipleSkills) {
 			if (index > 0) console.log("");
@@ -56,6 +58,14 @@ export async function runValidate(opts: ValidateOpts) {
 			);
 		}
 
+		const shouldSkipMissingEvals =
+			multipleSkills && fs.existsSync(paths.skillFile) && !fs.existsSync(paths.evalsFile);
+		if (shouldSkipMissingEvals) {
+			skipped++;
+			console.log(`  ${pc.yellow("↷")} Skipped: evals.json not found`);
+			continue;
+		}
+
 		if (fs.existsSync(paths.evalsFile)) {
 			try {
 				const raw = JSON.parse(fs.readFileSync(paths.evalsFile, "utf-8"));
@@ -77,6 +87,9 @@ export async function runValidate(opts: ValidateOpts) {
 	}
 
 	console.log("");
+	if (multipleSkills && skipped > 0) {
+		console.log(pc.yellow(`${skipped} skill(s) skipped because evals.json was not found.`));
+	}
 
 	if (hasError) {
 		console.log(pc.red("Validation found issues. Fix them before running evals.\n"));
