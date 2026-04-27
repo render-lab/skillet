@@ -129,4 +129,41 @@ describe("runAgentLoop", () => {
 		expect(result.transcript[0]?.turnSkipped).toBe("It's a Vue app built with Vite.");
 		expect(result.finalOutput).toBe("Here is the final answer.");
 	});
+
+	it("emits heartbeat updates while checking turn relevance", async () => {
+		const provider: LLMProvider = {
+			name: "test",
+			modelId: "test-model",
+			chat: vi.fn().mockResolvedValue({
+				content: "What framework are you using?",
+				usage: { inputTokens: 10, outputTokens: 5 },
+				stopReason: "end",
+				latencyMs: 100,
+			}),
+		};
+		const pendingCheck = deferred<boolean>();
+		const onActivity = vi.fn();
+
+		const runPromise = runAgentLoop({
+			provider,
+			system: "system",
+			turns: ["Help me deploy this frontend.", "It's a Vue app built with Vite."],
+			tools: [],
+			toolHandlers: {},
+			onActivity,
+			checkTurnRelevance: vi.fn(() => pendingCheck.promise),
+		});
+
+		await vi.advanceTimersByTimeAsync(5500);
+		pendingCheck.resolve(false);
+
+		await runPromise;
+
+		expect(onActivity).toHaveBeenCalledWith(
+			"turn 1/2 — checking turn relevance for turn 2/2…",
+		);
+		expect(onActivity).toHaveBeenCalledWith(
+			"turn 1/2 — checking turn relevance for turn 2/2… 5s",
+		);
+	});
 });

@@ -163,12 +163,13 @@ export async function runOrchestrator(
 			}
 		}
 	}
+	const totalRuns = matrix.length;
 
-	const concurrency = opts.concurrency ?? Math.min(matrix.length, MAX_CONCURRENCY);
+	const concurrency = opts.concurrency ?? Math.min(totalRuns, MAX_CONCURRENCY);
 
 	log(
 		pc.bold(
-			`Running ${matrix.length} eval(s): ${evals.length} eval(s) × ${config.providers.length} provider(s) × ${config.settings.runsPerProvider} run(s)`,
+			`Running ${totalRuns} eval(s): ${evals.length} eval(s) × ${config.providers.length} provider(s) × ${config.settings.runsPerProvider} run(s)`,
 		),
 	);
 
@@ -265,7 +266,7 @@ export async function runOrchestrator(
 				const result = await executeOne(entry);
 				results.push(result);
 				completed++;
-				spinner.succeed(id, formatSuccessLine(completed, matrix.length, entry, result));
+				spinner.succeed(id, formatSuccessLine(completed, totalRuns, entry, result));
 				return;
 			} catch (err) {
 				attempt++;
@@ -287,7 +288,7 @@ export async function runOrchestrator(
 				completed++;
 				spinner.succeed(
 					id,
-					`  ${pc.red("✗")} [${completed}/${matrix.length}] ` +
+					`  ${pc.red("✗")} [${completed}/${totalRuns}] ` +
 						`eval ${entry.evalCase.id} · ${entry.provider.modelId} · ` +
 						`run ${entry.runNumber} · ${pc.red(errMsg)}`,
 				);
@@ -296,9 +297,9 @@ export async function runOrchestrator(
 		}
 	}
 
-	spinner.start(matrix.length);
+	spinner.start(totalRuns);
 
-	const workers = Array.from({ length: Math.min(concurrency, matrix.length) }, async () => {
+	const workers = Array.from({ length: Math.min(concurrency, totalRuns) }, async () => {
 		while (matrix.length > 0) {
 			const entry = matrix.shift();
 			if (!entry) break;

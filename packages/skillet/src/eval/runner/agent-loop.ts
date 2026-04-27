@@ -14,13 +14,18 @@ import { type AgentRun, buildAgentRun } from "./transcript.js";
 
 const CHARS_PER_TOKEN = 4;
 const API_CALL_TIMEOUT_MS = 120_000;
-const HEARTBEAT_INTERVAL_MS = 15_000;
+const HEARTBEAT_INTERVAL_MS = 5_000;
+const TURN_RELEVANCE_HEARTBEAT_MS = 5_000;
 
 function formatElapsed(ms: number): string {
 	const seconds = Math.floor(ms / 1000);
 	if (seconds < 60) return `${seconds}s`;
 	const minutes = Math.floor(seconds / 60);
 	return `${minutes}m${seconds % 60}s`;
+}
+
+function turnPrefix(currentTurn: number, totalTurns: number): string {
+	return `turn ${currentTurn + 1}/${totalTurns}`;
 }
 
 export interface AgentLoopParams {
@@ -75,7 +80,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 			if (breakdown.length) console.error(breakdown.join("\n"));
 		}
 
-		emit(`step ${step + 1} — calling model…`);
+		emit(`${turnPrefix(currentTurn, turns.length)} — step ${step + 1} — calling model…`);
 
 		const preSize = debug ? totalPayloadSize(system, messages) : 0;
 		compactMessages(messages, system);
@@ -98,7 +103,9 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 			{
 				intervalMs: heartbeatIntervalMs,
 				onHeartbeat: (elapsedMs) =>
-					emit(`step ${step + 1} — still waiting on model… ${formatElapsed(elapsedMs)}`),
+					emit(
+						`${turnPrefix(currentTurn, turns.length)} — step ${step + 1} — still waiting on model… ${formatElapsed(elapsedMs)}`,
+					),
 			},
 		);
 
@@ -124,8 +131,19 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 				const userReply = turns[nextTurn];
 
 				if (params.checkTurnRelevance) {
-					emit("checking turn relevance…");
-					const relevant = await params.checkTurnRelevance(response.content, userReply);
+					emit(
+						`${turnPrefix(currentTurn, turns.length)} — checking turn relevance for turn ${nextTurn + 1}/${turns.length}…`,
+					);
+					const relevant = await withHeartbeat(
+						params.checkTurnRelevance(response.content, userReply),
+						{
+							intervalMs: TURN_RELEVANCE_HEARTBEAT_MS,
+							onHeartbeat: (elapsedMs) =>
+								emit(
+									`${turnPrefix(currentTurn, turns.length)} — checking turn relevance for turn ${nextTurn + 1}/${turns.length}… ${formatElapsed(elapsedMs)}`,
+								),
+						},
+					);
 					if (!relevant) {
 						emit("turn mismatch — agent didn't ask for expected input, ending conversation");
 						transcriptStep.turnSkipped = userReply;
@@ -136,7 +154,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 				messages.push({ role: "assistant", content: response.content });
 				currentTurn = nextTurn;
 				nextTurn++;
-				emit(`turn ${currentTurn + 1} — user: ${truncate(userReply, 60)}`);
+				emit(`turn ${currentTurn + 1}/${turns.length} — user: ${truncate(userReply, 60)}`);
 				transcriptStep.userMessage = userReply;
 				messages.push({ role: "user", content: userReply });
 				continue;
