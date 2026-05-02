@@ -75,6 +75,10 @@ jobs:
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_evals == 'true')
         run: pnpm skillet:run
 
+      - name: Generate static Skillet report
+        if: always()
+        run: pnpm exec skillet eval report --output .skillet-evals/report
+
       - name: Write Skillet summary
         if: always()
         run: |
@@ -279,6 +283,7 @@ jobs:
           path: |
             .skillet-evals/results
             .skillet-evals/summary.md
+            .skillet-evals/report
           if-no-files-found: ignore
 `;
 

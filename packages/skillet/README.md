@@ -17,13 +17,16 @@ skillet eval init
 skillet eval generate ./my-skill
 skillet eval validate ./my-skill
 skillet eval run ./my-skill
+skillet eval report
 skillet eval serve ./my-skill
 skillet eval compare golden.json current.json
 ```
 
 `skillet eval` runs a sandboxed agent loop against a skill directory, grades the result with an LLM judge, reads config from `skillet.eval.yaml` by default, and writes results to `.skillet-evals/results/<skill-name>/`.
 
-`skillet eval init` can also scaffold `.github/workflows/skillet-evals.yml` with validation, model eval runs, GitHub Actions summaries, PR comments, and raw result artifacts.
+`skillet eval report` writes a static HTML report to `.skillet-evals/report/`.
+
+`skillet eval init` can also scaffold `.github/workflows/skillet-evals.yml` with validation, model eval runs, GitHub Actions summaries, PR comments, raw result artifacts, and static HTML report artifacts.
 
 ## Core commands
 

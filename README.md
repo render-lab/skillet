@@ -99,7 +99,7 @@ This gives you a benchmark history for each skill. You can use it to compare pro
 
 Run `skillet eval init` once per project to create `skillet.eval.yaml`. That file configures providers, grader settings, and the local skill roots that `skillet eval` uses to discover skills by default.
 
-`skillet eval init` can also scaffold `.github/workflows/skillet-evals.yml`. The workflow validates eval definitions, runs model evals, writes a GitHub Actions job summary, comments on pull requests, and uploads raw `.skillet-evals/results` artifacts.
+`skillet eval init` can also scaffold `.github/workflows/skillet-evals.yml`. The workflow validates eval definitions, runs model evals, writes a GitHub Actions job summary, comments on pull requests, and uploads raw `.skillet-evals/results` artifacts plus a static HTML report.
 
 ### Eval definitions
 
@@ -308,12 +308,13 @@ skillet eval init
 skillet eval scaffold
 skillet eval validate
 skillet eval run
+skillet eval report
 skillet eval generate ./my-skill
 skillet eval fixtures ./my-skill
 skillet eval serve ./my-skill
 ```
 
-`skillet eval` runs evals against Anthropic, OpenAI, and Google models. Configure API keys via environment variables such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GOOGLE_API_KEY`. By default, eval config lives in `skillet.eval.yaml`, discovered skills come from the configured local roots, and results are written to `.skillet-evals/results/<skill-name>/`.
+`skillet eval` runs evals against Anthropic, OpenAI, and Google models. Configure API keys via environment variables such as `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, and `GOOGLE_API_KEY`. By default, eval config lives in `skillet.eval.yaml`, discovered skills come from the configured local roots, results are written to `.skillet-evals/results/<skill-name>/`, and static reports are written to `.skillet-evals/report/`.
 
 ### Typical eval flow
 

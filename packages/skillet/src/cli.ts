@@ -11,6 +11,7 @@ import { runCompare } from "./eval/commands/compare.js";
 import { runFixtures } from "./eval/commands/fixtures.js";
 import { runGenerate } from "./eval/commands/generate.js";
 import { runInit as runEvalInit } from "./eval/commands/init.js";
+import { runReport } from "./eval/commands/report.js";
 import { runRun } from "./eval/commands/run.js";
 import { runScaffold } from "./eval/commands/scaffold.js";
 import { runServe } from "./eval/commands/serve.js";
@@ -154,6 +155,19 @@ evalProgram
 			const resolvedSkill = skill ?? ".";
 			loadEnvForSkills([resolvedSkill]);
 			return runServe({ ...opts, skill: resolvedSkill });
+		}),
+	);
+
+evalProgram
+	.command("report [skill]")
+	.description("Generate a static HTML report for local eval results")
+	.option("--evals <path>", "Path to evals.json")
+	.option("--output <path>", "Output directory", ".skillet-evals/report")
+	.action((skill, opts) =>
+		runEvalCommand(() => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkills([resolvedSkill]);
+			return runReport({ ...opts, skill: resolvedSkill });
 		}),
 	);
 
