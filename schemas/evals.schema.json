@@ -12,6 +12,19 @@
       "type": "array",
       "items": { "type": "string" }
     },
+    "providers": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "mocks": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          { "$ref": "#/$defs/MockConfig" }
+        ]
+      }
+    },
     "evals": {
       "type": "array",
       "minItems": 1,
@@ -37,6 +50,10 @@
           "items": { "type": "string" },
           "default": []
         },
+        "mocks": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/EvalMockScenario" }
+        },
         "assertions": {
           "type": "array",
           "items": { "type": "string" },
@@ -48,6 +65,61 @@
         { "required": ["prompt"] },
         { "required": ["turns"] }
       ]
+    },
+    "EvalMockScenario": {
+      "type": "object",
+      "properties": {
+        "state": { "type": "object" },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "response": {},
+              "responseFromState": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MockConfig": {
+      "type": "object",
+      "properties": {
+        "openapi": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "mcpServer": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "expose": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["http", "tools"] }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "parameters": { "type": "object" },
+              "response": {},
+              "responseFromState": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

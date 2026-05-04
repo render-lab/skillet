@@ -15,28 +15,30 @@ export const SkillDiscoveryConfigSchema = z.object({
 	roots: z.array(z.string()).default([]),
 });
 
-const IntegrationExposeSchema = z.enum(["http", "tools"]);
+const MockExposeSchema = z.enum(["http", "tools"]);
 
 export const MockToolConfigSchema = z.object({
 	name: z.string(),
-	description: z.string().default("Mock integration tool"),
+	description: z.string().default("Mock tool"),
 	parameters: z.record(z.unknown()).optional(),
 	response: z.unknown().optional(),
 	responseFromState: z.string().optional(),
 });
 
-export const MockIntegrationConfigSchema = z.object({
+export const MockConfigSchema = z.object({
 	openapi: z.union([z.string(), z.array(z.string())]).optional(),
 	mcpServer: z.union([z.string(), z.array(z.string())]).optional(),
-	expose: z.array(IntegrationExposeSchema).default(["http", "tools"]),
+	expose: z.array(MockExposeSchema).default(["http", "tools"]),
 	tools: z.array(MockToolConfigSchema).default([]),
 });
 
+const ProviderEntrySchema = z.union([z.string(), ProviderConfigSchema]);
+
 export const ConfigFileSchema = z.object({
-	providers: z.array(ProviderConfigSchema).min(1),
+	providers: z.array(ProviderEntrySchema).min(1),
 	grader: GraderConfigSchema.optional(),
 	skills: SkillDiscoveryConfigSchema.default({}),
-	integrations: z.record(MockIntegrationConfigSchema).default({}),
+	mocks: z.record(MockConfigSchema).default({}),
 	settings: z
 		.object({
 			maxSteps: z.number().int().positive().default(20),
@@ -51,7 +53,7 @@ export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 export type GraderConfig = z.infer<typeof GraderConfigSchema>;
 export type SkillDiscoveryConfig = z.infer<typeof SkillDiscoveryConfigSchema>;
 export type MockToolConfig = z.infer<typeof MockToolConfigSchema>;
-export type MockIntegrationConfig = z.infer<typeof MockIntegrationConfigSchema>;
+export type MockConfig = z.infer<typeof MockConfigSchema>;
 export type Config = z.infer<typeof ConfigFileSchema>;
 
 export interface ResolvedConfig {
@@ -59,7 +61,7 @@ export interface ResolvedConfig {
 	grader: GraderConfig & { apiKey: string };
 	skillRoots: string[];
 	settings: Config["settings"];
-	integrations: Record<string, MockIntegrationConfig>;
+	mocks: Record<string, MockConfig>;
 }
 
 export interface CliOverrides {

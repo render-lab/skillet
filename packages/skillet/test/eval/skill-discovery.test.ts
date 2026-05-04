@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { resolveSkillPaths } from "../../src/eval/config/paths.js";
 import {
 	discoverSkillsFromRoots,
 	resolveSkillSelection,
@@ -63,5 +64,49 @@ describe("skill discovery", () => {
 		await createSkill(tmpDir, "local-skills/beta");
 
 		expect(suggestSkillRoots(tmpDir)).toEqual(["local-skills"]);
+	});
+});
+
+describe("resolveSkillPaths layout fallback", () => {
+	let tmpDir: string;
+
+	beforeEach(async () => {
+		tmpDir = await mkdtemp(path.join(tmpdir(), "skillet-layout-"));
+	});
+
+	afterEach(async () => {
+		await rm(tmpDir, { recursive: true, force: true });
+	});
+
+	it("prefers the flat <skill>/evals.json layout when both exist", async () => {
+		const skillDir = await createSkill(tmpDir, "alpha");
+		await writeFile(path.join(skillDir, "evals.json"), "{}");
+		await mkdir(path.join(skillDir, "evals"), { recursive: true });
+		await writeFile(path.join(skillDir, "evals", "evals.json"), "{}");
+
+		const paths = resolveSkillPaths(skillDir);
+
+		expect(paths.evalsFile).toBe(path.join(skillDir, "evals.json"));
+		expect(paths.evalsDir).toBe(skillDir);
+	});
+
+	it("falls back to <skill>/evals/evals.json for the skill-creator layout", async () => {
+		const skillDir = await createSkill(tmpDir, "beta");
+		await mkdir(path.join(skillDir, "evals", "files"), { recursive: true });
+		await writeFile(path.join(skillDir, "evals", "evals.json"), "{}");
+
+		const paths = resolveSkillPaths(skillDir);
+
+		expect(paths.evalsFile).toBe(path.join(skillDir, "evals", "evals.json"));
+		expect(paths.evalsDir).toBe(path.join(skillDir, "evals"));
+	});
+
+	it("returns the flat path when no evals.json exists yet", async () => {
+		const skillDir = await createSkill(tmpDir, "gamma");
+
+		const paths = resolveSkillPaths(skillDir);
+
+		expect(paths.evalsFile).toBe(path.join(skillDir, "evals.json"));
+		expect(paths.evalsDir).toBe(skillDir);
 	});
 });

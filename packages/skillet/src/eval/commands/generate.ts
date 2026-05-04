@@ -11,11 +11,7 @@ import {
 } from "../config.js";
 import { createProvider } from "../providers/factory.js";
 import { PRICING } from "../providers/pricing.js";
-import {
-	type IntegrationMockSummary,
-	summarizeIntegrationMockSources,
-	writeIntegrationMockManifests,
-} from "../runner/integration-mocks.js";
+import { type MockSummary, summarizeMockSources, writeMockManifests } from "../runner/mocks.js";
 import { Spinner } from "../runner/spinner.js";
 import { EvalsFileSchema, getTurns } from "../schemas/evals.js";
 import { exitWithMissingSkillFile } from "../utils/cli-error.js";
@@ -37,7 +33,7 @@ Return ONLY valid JSON matching this exact structure (no other text):
       "prompt": "<a realistic user prompt that exercises a key capability>",
       "expected_output": "<description of what correct behavior looks like>",
       "files": [],
-      "integrations": {},
+      "mocks": {},
       "assertions": [
         "<specific, verifiable assertion about the agent's behavior>"
       ]
@@ -71,7 +67,7 @@ Guidelines:
 - When using "turns", the first message is intentionally vague or incomplete so the agent must ask a clarifying question. The second message is the user's reply. You can use 2-4 turns.
 - When using "turns", assertions can reference behavior across turns (e.g., "After the user provides X, the agent does Y")
 - A good eval suite mixes single-turn and multi-turn evals. Use multi-turn whenever the scenario naturally calls for it — don't force everything into a single prompt.
-- When integration mock resources are provided, use the "integrations" object for evals that need external API or MCP-style tool access. Do not invent integration names, route override keys, or tool override keys. Use only the provided names and keys.
+- When mock resources are provided, use the "mocks" object for evals that need external API or MCP-style tool access. Do not invent mock names, route override keys, or tool override keys. Use only the provided names and keys.
 - Put reusable API/tool source information in config, not in generated evals. Generated evals should include only scenario-specific "state" and "overrides".
 - Use "responseFromState" for route and tool overrides when possible. Examples: "services", "services[id]", "deploys[serviceId]". Use static "response" only for one-off values.`;
 
@@ -80,7 +76,7 @@ function buildGeneratePrompt(
 	references: Array<{ name: string; content: string }>,
 	count: number,
 	models: string[],
-	integrationSummaries: IntegrationMockSummary[],
+	mockSummaries: MockSummary[],
 ): string {
 	let prompt = `Generate ${count} eval test cases for the following skill.
 
@@ -95,37 +91,37 @@ ${skillContent}`;
 		}
 	}
 
-	if (integrationSummaries.length > 0) {
-		prompt += "\n\n## Available Integration Mock Resources\n";
+	if (mockSummaries.length > 0) {
+		prompt += "\n\n## Available Mock Resources\n";
 		prompt +=
-			"Use these resources only when they help test the skill. Include an `integrations` object in generated eval cases that need them.\n";
-		for (const integration of integrationSummaries) {
-			prompt += `\n### ${integration.name}\n`;
-			if (integration.httpRoutes.length > 0) {
+			"Use these resources only when they help test the skill. Include a `mocks` object in generated eval cases that need them.\n";
+		for (const mock of mockSummaries) {
+			prompt += `\n### ${mock.name}\n`;
+			if (mock.httpRoutes.length > 0) {
 				prompt += "\nHTTP route override keys:\n";
-				for (const route of integration.httpRoutes.slice(0, 40)) {
+				for (const route of mock.httpRoutes.slice(0, 40)) {
 					const params = route.params.length ? ` params: ${route.params.join(", ")}` : "";
 					prompt += `- ${route.key}${params}\n`;
 				}
 			}
-			if (integration.tools.length > 0) {
+			if (mock.tools.length > 0) {
 				prompt += "\nMCP-style tool override keys:\n";
-				for (const tool of integration.tools.slice(0, 40)) {
+				for (const tool of mock.tools.slice(0, 40)) {
 					prompt += `- ${tool.key}: ${tool.description}\n`;
 				}
 			}
-			if (integration.errors.length > 0) {
+			if (mock.errors.length > 0) {
 				prompt += "\nImport notes:\n";
-				for (const error of integration.errors) {
+				for (const error of mock.errors) {
 					prompt += `- ${error}\n`;
 				}
 			}
 		}
-		prompt += `\nWhen an eval uses an integration, follow this shape:
+		prompt += `\nWhen an eval uses a mock, follow this shape:
 
 {
-  "integrations": {
-    "<integration_name>": {
+  "mocks": {
+    "<mock_name>": {
       "state": {
         "<collection>": [{ "id": "<id>", "...": "..." }]
       },
@@ -231,10 +227,10 @@ export async function runGenerate(opts: GenerateOpts) {
 	);
 
 	const provider = createProvider(config.providers[0]);
-	if (Object.keys(config.integrations).length > 0) {
-		await writeIntegrationMockManifests(config.integrations);
+	if (Object.keys(config.mocks).length > 0) {
+		await writeMockManifests(config.mocks);
 	}
-	const integrationSummaries = await summarizeIntegrationMockSources(config.integrations);
+	const mockSummaries = await summarizeMockSources(config.mocks);
 
 	prompts.log.info(`Generator: ${pc.bold(provider.modelId)}`);
 	prompts.log.info(`Models: ${pc.bold(models.join(", "))}`);
@@ -242,10 +238,8 @@ export async function runGenerate(opts: GenerateOpts) {
 	if (skills.length > 1) {
 		prompts.log.info(`Skills: ${pc.bold(String(skills.length))} total`);
 	}
-	if (integrationSummaries.length > 0) {
-		prompts.log.info(
-			`Integration mocks: ${pc.bold(integrationSummaries.map((i) => i.name).join(", "))}`,
-		);
+	if (mockSummaries.length > 0) {
+		prompts.log.info(`Mocks: ${pc.bold(mockSummaries.map((m) => m.name).join(", "))}`);
 	}
 
 	for (const [index, skill] of skills.entries()) {
@@ -255,7 +249,7 @@ export async function runGenerate(opts: GenerateOpts) {
 			models,
 			count: finalCount,
 			provider,
-			integrationSummaries,
+			mockSummaries,
 			progress: { index: index + 1, total: skills.length },
 		});
 	}
@@ -268,7 +262,7 @@ async function runGenerateForSkill(opts: {
 	models: string[];
 	count: number;
 	provider: ReturnType<typeof createProvider>;
-	integrationSummaries: IntegrationMockSummary[];
+	mockSummaries: MockSummary[];
 	progress: { index: number; total: number };
 }) {
 	const paths = resolveSkillPaths(opts.skill);
@@ -334,7 +328,7 @@ async function runGenerateForSkill(opts: {
 		references,
 		opts.count,
 		opts.models,
-		opts.integrationSummaries,
+		opts.mockSummaries,
 	);
 
 	const chatMessages: Array<{ role: "user" | "assistant"; content: string }> = [

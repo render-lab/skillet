@@ -1,21 +1,124 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import * as prompts from "@clack/prompts";
 import pc from "picocolors";
 import YAML from "yaml";
 import { ConfigFileSchema, PROVIDER_REGISTRY, suggestSkillRoots } from "../config.js";
-import { writeIntegrationMockManifests } from "../runner/integration-mocks.js";
+import { writeMockManifests } from "../runner/mocks.js";
 import { exitIfCancelled } from "../utils/prompt.js";
 
-interface InitIntegration {
+interface InitMock {
 	openapi?: string;
 	mcpServer?: string;
 	expose: Array<"http" | "tools">;
 }
 
 const GITHUB_WORKFLOW_PATH = path.join(".github", "workflows", "skillet-evals.yml");
+const GITHUB_WORKFLOW_CLEANUP_PATH = path.join(".github", "workflows", "skillet-evals-cleanup.yml");
+const RENDER_YAML_PATH = "render.yaml";
 
-const GITHUB_WORKFLOW = String.raw`name: Skillet evals
+const RENDER_YAML = `services:
+  - type: web
+    runtime: static
+    name: skillet-reports
+    branch: eval-reports
+    buildCommand: ":"
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+`;
+
+const GITHUB_WORKFLOW_CLEANUP = String.raw`name: Skillet evals cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove pr-\${{ github.event.pull_request.number }} from eval-reports
+        env:
+          PR: \${{ github.event.pull_request.number }}
+          REPO: \${{ github.repository }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git clone --depth 1 --branch eval-reports \
+              "https://x-access-token:$GITHUB_TOKEN@github.com/$REPO.git" reports; then
+            echo "No eval-reports branch yet; nothing to clean."
+            exit 0
+          fi
+          cd reports
+          if [ -d "pr-$PR" ]; then
+            git rm -rf "pr-$PR"
+            git commit -m "cleanup: pr-$PR"
+            git push origin eval-reports
+          fi
+`;
+
+function buildEvalsWorkflow({ hosted }: { hosted: boolean }): string {
+	const contentsPermission = hosted ? "write" : "read";
+
+	const publishStep = hosted
+		? String.raw`
+      - name: Publish report to eval-reports branch
+        if: github.event_name == 'pull_request'
+        env:
+          PR: \${{ github.event.pull_request.number }}
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code origin eval-reports >/dev/null 2>&1; then
+            git fetch origin eval-reports
+            git worktree add /tmp/reports eval-reports
+          else
+            git worktree add --orphan -b eval-reports /tmp/reports
+            (cd /tmp/reports && git rm -rf . >/dev/null 2>&1 || true)
+          fi
+          rm -rf "/tmp/reports/pr-$PR"
+          mkdir -p "/tmp/reports/pr-$PR"
+          cp -R .skillet-evals/report/. "/tmp/reports/pr-$PR/"
+          cd /tmp/reports
+          git add .
+          git commit -m "report: pr-$PR (\${GITHUB_SHA:0:7})" || exit 0
+          for i in 1 2 3; do
+            git pull --rebase origin eval-reports || true
+            git push origin eval-reports && break
+            sleep $((RANDOM % 5 + 1))
+          done
+`
+		: "";
+
+	const commentEnv = hosted
+		? String.raw`        env:
+          SKILLET_REPORT_BASE_URL: \${{ vars.SKILLET_REPORT_BASE_URL }}
+`
+		: "";
+
+	const linkLogic = hosted
+		? String.raw`            const base = (process.env.SKILLET_REPORT_BASE_URL || "").replace(/\/$/, "");
+            const link = base
+              ? "Full report: " + base + "/pr-" + context.payload.pull_request.number + "/\n\n"
+              : "";
+`
+		: `            const link = "";\n`;
+
+	return String.raw`name: Skillet evals
 
 on:
   workflow_dispatch:
@@ -31,12 +134,12 @@ on:
   pull_request:
     paths:
       - "skills/**"
-      - "skillet.eval.yaml"
+      - "skillet.config.yaml"
       - "package.json"
       - "pnpm-lock.yaml"
 
 permissions:
-  contents: read
+  contents: ${contentsPermission}
   pull-requests: write
 
 jobs:
@@ -75,6 +178,10 @@ jobs:
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_evals == 'true')
         run: pnpm skillet:run
 
+      - name: Generate static Skillet report
+        if: always()
+        run: pnpm exec skillet eval report --output .skillet-evals/report
+${publishStep}
       - name: Write Skillet summary
         if: always()
         run: |
@@ -249,7 +356,7 @@ jobs:
 
       - name: Comment Skillet summary on PR
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+${commentEnv}        uses: actions/github-script@v7
         with:
           script: |
             const fs = require("node:fs");
@@ -258,7 +365,7 @@ jobs:
             const summary = fs.existsSync(summaryPath)
               ? fs.readFileSync(summaryPath, "utf8")
               : "## Skillet evals\n\nNo summary was generated.\n";
-            const body = marker + "\n" + summary;
+${linkLogic}            const body = marker + "\n" + link + summary;
 
             const { owner, repo } = context.repo;
             const issue_number = context.payload.pull_request.number;
@@ -279,8 +386,49 @@ jobs:
           path: |
             .skillet-evals/results
             .skillet-evals/summary.md
+            .skillet-evals/report
           if-no-files-found: ignore
 `;
+}
+
+function deriveRenderDeployUrl(): string {
+	const fallback = "https://render.com/deploy?repo=<your-repo-url>";
+	try {
+		const remote = execSync("git remote get-url origin", {
+			encoding: "utf-8",
+			stdio: ["ignore", "pipe", "ignore"],
+		}).trim();
+		if (!remote) return fallback;
+
+		const sshMatch = remote.match(/^git@([^:]+):(.+?)(?:\.git)?\/?$/);
+		const httpsUrl = sshMatch
+			? `https://${sshMatch[1]}/${sshMatch[2]}`
+			: remote.replace(/\.git\/?$/, "");
+
+		return `https://render.com/deploy?repo=${httpsUrl}`;
+	} catch {
+		return fallback;
+	}
+}
+
+async function maybeWriteFile(
+	target: string,
+	contents: string,
+	{ overwritePromptMessage }: { overwritePromptMessage: string },
+): Promise<boolean> {
+	if (fs.existsSync(target)) {
+		const overwrite = exitIfCancelled(
+			await prompts.confirm({
+				message: overwritePromptMessage,
+				initialValue: false,
+			}),
+		);
+		if (!overwrite) return false;
+	}
+	fs.mkdirSync(path.dirname(target) || ".", { recursive: true });
+	fs.writeFileSync(target, contents);
+	return true;
+}
 
 export async function runInit() {
 	prompts.intro(pc.bold("skillet eval init"));
@@ -364,23 +512,24 @@ export async function runInit() {
 		}),
 	) as string;
 
-	const integrations: Record<string, InitIntegration> = {};
-	const configureIntegrations = exitIfCancelled(
+	const mocks: Record<string, InitMock> = {};
+	const configureMocks = exitIfCancelled(
 		await prompts.confirm({
-			message: "Configure integration mocks from OpenAPI or an MCP server repo?",
+			message:
+				"Configure mocks now from an OpenAPI spec or MCP server repo? (You can also run `skillet mock import` later.)",
 			initialValue: false,
 		}),
 	);
 
-	if (configureIntegrations) {
+	if (configureMocks) {
 		let addAnother = true;
 		while (addAnother) {
 			const name = exitIfCancelled(
 				await prompts.text({
-					message: "Integration name",
-					placeholder: "render",
+					message: "Mock name",
+					placeholder: "render-api",
 					validate: (value) => {
-						if (!value.trim()) return "Enter an integration name.";
+						if (!value.trim()) return "Enter a mock name.";
 						if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(value.trim())) {
 							return "Use letters, numbers, underscores, or dashes.";
 						}
@@ -404,7 +553,7 @@ export async function runInit() {
 
 			const expose = exitIfCancelled(
 				await prompts.multiselect({
-					message: "Expose this integration as",
+					message: "Expose this mock as",
 					options: [
 						{ value: "http", label: "Local mock HTTP API" },
 						{ value: "tools", label: "MCP-style model tools" },
@@ -414,20 +563,20 @@ export async function runInit() {
 				}),
 			) as Array<"http" | "tools">;
 
-			const integration: InitIntegration = { expose };
-			if (openapi.trim()) integration.openapi = openapi.trim();
-			if (mcpServer.trim()) integration.mcpServer = mcpServer.trim();
+			const mock: InitMock = { expose };
+			if (openapi.trim()) mock.openapi = openapi.trim();
+			if (mcpServer.trim()) mock.mcpServer = mcpServer.trim();
 
-			if (!integration.openapi && !integration.mcpServer) {
-				prompts.log.warn("No OpenAPI spec or MCP server path provided; skipping integration.");
+			if (!mock.openapi && !mock.mcpServer) {
+				prompts.log.warn("No OpenAPI spec or MCP server path provided; skipping mock.");
 			} else {
-				integrations[name.trim()] = integration;
+				mocks[name.trim()] = mock;
 			}
 
 			addAnother = Boolean(
 				exitIfCancelled(
 					await prompts.confirm({
-						message: "Add another integration mock?",
+						message: "Add another mock?",
 						initialValue: false,
 					}),
 				),
@@ -449,7 +598,7 @@ export async function runInit() {
 				.map((root) => root.trim())
 				.filter(Boolean),
 		},
-		...(Object.keys(integrations).length > 0 ? { integrations } : {}),
+		...(Object.keys(mocks).length > 0 ? { mocks } : {}),
 		settings: {
 			maxSteps: 20,
 			timeout: 300,
@@ -459,7 +608,7 @@ export async function runInit() {
 	};
 
 	const yamlStr = YAML.stringify(config);
-	const outputPath = "skillet.eval.yaml";
+	const outputPath = "skillet.config.yaml";
 
 	if (fs.existsSync(outputPath)) {
 		const overwrite = exitIfCancelled(
@@ -472,10 +621,10 @@ export async function runInit() {
 	}
 
 	fs.writeFileSync(outputPath, yamlStr);
-	if (Object.keys(integrations).length > 0) {
+	if (Object.keys(mocks).length > 0) {
 		const parsedConfig = ConfigFileSchema.parse(config);
-		const manifests = await writeIntegrationMockManifests(parsedConfig.integrations);
-		prompts.log.success(`Wrote ${manifests.length} integration mock manifest(s)`);
+		const manifests = await writeMockManifests(parsedConfig.mocks);
+		prompts.log.success(`Wrote ${manifests.length} mock manifest(s)`);
 	}
 
 	const writeWorkflow = exitIfCancelled(
@@ -484,23 +633,62 @@ export async function runInit() {
 			initialValue: false,
 		}),
 	);
+
+	let hostOnRender = false;
 	if (writeWorkflow) {
-		let shouldWriteWorkflow = true;
-		if (fs.existsSync(GITHUB_WORKFLOW_PATH)) {
-			shouldWriteWorkflow = Boolean(
-				exitIfCancelled(
-					await prompts.confirm({
-						message: `${GITHUB_WORKFLOW_PATH} already exists. Overwrite?`,
-						initialValue: false,
-					}),
-				),
+		hostOnRender = Boolean(
+			exitIfCancelled(
+				await prompts.confirm({
+					message: "Host eval reports on Render (one shared static site, per-PR sub-paths)?",
+					initialValue: false,
+				}),
+			),
+		);
+	}
+
+	if (writeWorkflow) {
+		const wroteWorkflow = await maybeWriteFile(
+			GITHUB_WORKFLOW_PATH,
+			buildEvalsWorkflow({ hosted: hostOnRender }),
+			{ overwritePromptMessage: `${GITHUB_WORKFLOW_PATH} already exists. Overwrite?` },
+		);
+		if (wroteWorkflow) prompts.log.success(`Wrote ${GITHUB_WORKFLOW_PATH}`);
+	}
+
+	if (hostOnRender) {
+		const wroteRenderYaml = await maybeWriteFile(RENDER_YAML_PATH, RENDER_YAML, {
+			overwritePromptMessage: `${RENDER_YAML_PATH} already exists. Overwrite?`,
+		});
+		if (wroteRenderYaml) {
+			prompts.log.success(`Wrote ${RENDER_YAML_PATH}`);
+		} else {
+			prompts.log.warn(
+				`Skipped ${RENDER_YAML_PATH}. Add a static site that serves the eval-reports branch:\n\n${RENDER_YAML}`,
 			);
 		}
-		if (shouldWriteWorkflow) {
-			fs.mkdirSync(path.dirname(GITHUB_WORKFLOW_PATH), { recursive: true });
-			fs.writeFileSync(GITHUB_WORKFLOW_PATH, GITHUB_WORKFLOW);
-			prompts.log.success(`Wrote ${GITHUB_WORKFLOW_PATH}`);
-		}
+
+		const wroteCleanup = await maybeWriteFile(
+			GITHUB_WORKFLOW_CLEANUP_PATH,
+			GITHUB_WORKFLOW_CLEANUP,
+			{ overwritePromptMessage: `${GITHUB_WORKFLOW_CLEANUP_PATH} already exists. Overwrite?` },
+		);
+		if (wroteCleanup) prompts.log.success(`Wrote ${GITHUB_WORKFLOW_CLEANUP_PATH}`);
+
+		const deployUrl = deriveRenderDeployUrl();
+		prompts.note(
+			[
+				"1. Deploy the Blueprint to Render:",
+				`   ${deployUrl}`,
+				"2. Copy the resulting Static Site URL (e.g. https://skillet-reports-abcd.onrender.com).",
+				"3. In your repo: Settings > Secrets and variables > Actions > Variables",
+				"   Add SKILLET_REPORT_BASE_URL = <your service URL>",
+				"",
+				"PRs will then publish to <SKILLET_REPORT_BASE_URL>/pr-<N>/ and the link",
+				"will be prepended to the PR comment automatically.",
+			].join("\n"),
+			"Hosted reports setup",
+		);
 	}
+
 	prompts.outro(`${pc.green("✓")} Wrote ${outputPath}`);
 }

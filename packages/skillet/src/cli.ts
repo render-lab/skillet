@@ -1,16 +1,12 @@
 import path from "node:path";
 import { Command } from "commander";
 import pc from "picocolors";
-import { runAdd } from "./commands/add.js";
-import { runEmit } from "./commands/emit.js";
-import { runInit } from "./commands/init.js";
-import { runInstall } from "./commands/install.js";
-import { runStatus } from "./commands/status.js";
-import { runUpdate } from "./commands/update.js";
 import { runCompare } from "./eval/commands/compare.js";
 import { runFixtures } from "./eval/commands/fixtures.js";
 import { runGenerate } from "./eval/commands/generate.js";
 import { runInit as runEvalInit } from "./eval/commands/init.js";
+import { runMockImport } from "./eval/commands/mock-import.js";
+import { runReport } from "./eval/commands/report.js";
 import { runRun } from "./eval/commands/run.js";
 import { runScaffold } from "./eval/commands/scaffold.js";
 import { runServe } from "./eval/commands/serve.js";
@@ -27,7 +23,7 @@ program.configureOutput({
 	outputError: (str, write) => write(pc.red(str)),
 });
 
-async function runEvalCommand(command: () => void | Promise<void>) {
+async function runCliCommand(command: () => void | Promise<void>) {
 	try {
 		await command();
 	} catch (err) {
@@ -44,43 +40,10 @@ function loadEnvForSkills(skills?: string[]) {
 	loadDotenv(dirs);
 }
 
-program.name("skillet").description("Toolkit for AI agent skills").version(VERSION);
-
 program
-	.command("init")
-	.description("Initialize skills.json in the current project")
-	.action(() => runInit());
-
-program
-	.command("add <spec...>")
-	.description("Add skill dependencies (e.g. owner/repo/skill@^1.0.0)")
-	.option("--all", "When a path contains multiple skills, add all without prompting")
-	.action((specs, opts) => runAdd({ specs, all: opts.all }));
-
-program
-	.command("install")
-	.alias("i")
-	.description("Install all dependencies from skills.json and update lockfile")
-	.action(() => runInstall());
-
-program
-	.command("emit")
-	.description("Emit context files for target agent runtimes")
-	.option(
-		"--target <targets>",
-		"Comma-separated targets (cursor, claude-code, codex, windsurf, cline, generic)",
-	)
-	.action((opts) => runEmit(opts));
-
-program
-	.command("update [skills...]")
-	.description("Update skills to latest versions matching manifest ranges")
-	.action((skills) => runUpdate({ skills }));
-
-program
-	.command("status")
-	.description("Show installed skills and their state")
-	.action(() => runStatus());
+	.name("skillet")
+	.description("Multi-provider skill evals with integration mocks")
+	.version(VERSION);
 
 const evalProgram = program
 	.command("eval")
@@ -88,9 +51,9 @@ const evalProgram = program
 
 evalProgram
 	.command("init")
-	.description("Scaffold a skillet.eval.yaml config file interactively")
+	.description("Scaffold a skillet.config.yaml config file interactively")
 	.action(() =>
-		runEvalCommand(() => {
+		runCliCommand(() => {
 			loadDotenv();
 			return runEvalInit();
 		}),
@@ -100,9 +63,9 @@ evalProgram
 	.command("generate [skills...]")
 	.description("Auto-generate starter evals.json files from SKILL.md using an LLM")
 	.option("--count <n>", "Number of evals to generate", "3")
-	.option("--config <path>", "Path to skillet.eval.yaml")
+	.option("--config <path>", "Path to skillet.config.yaml")
 	.action((skills, opts) =>
-		runEvalCommand(() => {
+		runCliCommand(() => {
 			loadEnvForSkills(skills);
 			return runGenerate({ ...opts, skills });
 		}),
@@ -112,9 +75,9 @@ evalProgram
 	.command("fixtures [skills...]")
 	.description("Generate fixture files referenced by evals.json using an LLM")
 	.option("--evals <path>", "Path to evals.json")
-	.option("--config <path>", "Path to skillet.eval.yaml")
+	.option("--config <path>", "Path to skillet.config.yaml")
 	.action((skills, opts) =>
-		runEvalCommand(async () => {
+		runCliCommand(async () => {
 			loadEnvForSkills(skills);
 			await runFixtures({ ...opts, skills });
 		}),
@@ -124,9 +87,9 @@ evalProgram
 	.command("scaffold [skills...]")
 	.description("Generate evals and fixture files in one step (generate + fixtures)")
 	.option("--count <n>", "Number of evals to generate", "3")
-	.option("--config <path>", "Path to skillet.eval.yaml")
+	.option("--config <path>", "Path to skillet.config.yaml")
 	.action((skills, opts) =>
-		runEvalCommand(async () => {
+		runCliCommand(async () => {
 			loadEnvForSkills(skills);
 			await runScaffold({ ...opts, skills });
 		}),
@@ -136,9 +99,9 @@ evalProgram
 	.command("validate [skills...]")
 	.description("Pre-flight checks for one or more skills: verify directories, evals, and API keys")
 	.option("--evals <path>", "Path to evals.json")
-	.option("--config <path>", "Path to skillet.eval.yaml")
+	.option("--config <path>", "Path to skillet.config.yaml")
 	.action((skills, opts) =>
-		runEvalCommand(() => {
+		runCliCommand(() => {
 			loadEnvForSkills(skills);
 			return runValidate({ ...opts, skills });
 		}),
@@ -150,7 +113,7 @@ evalProgram
 	.option("--evals <path>", "Path to evals.json")
 	.option("--port <n>", "Port to serve on", "3000")
 	.action((skill, opts) =>
-		runEvalCommand(() => {
+		runCliCommand(() => {
 			const resolvedSkill = skill ?? ".";
 			loadEnvForSkills([resolvedSkill]);
 			return runServe({ ...opts, skill: resolvedSkill });
@@ -158,10 +121,23 @@ evalProgram
 	);
 
 evalProgram
+	.command("report [skill]")
+	.description("Generate a static HTML report for local eval results")
+	.option("--evals <path>", "Path to evals.json")
+	.option("--output <path>", "Output directory", ".skillet-evals/report")
+	.action((skill, opts) =>
+		runCliCommand(() => {
+			const resolvedSkill = skill ?? ".";
+			loadEnvForSkills([resolvedSkill]);
+			return runReport({ ...opts, skill: resolvedSkill });
+		}),
+	);
+
+evalProgram
 	.command("run [skills...]")
 	.description("Run evals across configured providers for one or more skills")
 	.option("--evals <path>", "Path to evals.json (default: <skill>/evals.json)")
-	.option("--config <path>", "Path to skillet.eval.yaml")
+	.option("--config <path>", "Path to skillet.config.yaml")
 	.option("--eval-id <ids>", "Comma-separated eval IDs to run")
 	.option("--providers <names>", "Comma-separated provider names")
 	.option("--model <spec...>", "Model name (repeatable, e.g. gpt-5.2 claude-sonnet-4-6)")
@@ -171,7 +147,7 @@ evalProgram
 	.option("--concurrency <n>", "Max concurrent eval runs (default: all, max 10)")
 	.option("--golden <path>", "Golden benchmark file to compare against for regression")
 	.action((skills, opts) =>
-		runEvalCommand(async () => {
+		runCliCommand(async () => {
 			loadEnvForSkills(skills);
 			await runRun({ ...opts, skills });
 		}),
@@ -183,5 +159,14 @@ evalProgram
 	.action((golden, current) => {
 		runCompare(golden, current);
 	});
+
+const mockProgram = program.command("mock").description("Manage integration mocks for evals");
+
+mockProgram
+	.command("import <kind> <source>")
+	.description("Import a mock from an OpenAPI spec or MCP server repo into skillet.config.yaml")
+	.option("--name <name>", "Mock name (defaults to source basename)")
+	.option("--config <path>", "Path to skillet.config.yaml")
+	.action((kind, source, opts) => runCliCommand(() => runMockImport({ kind, source, ...opts })));
 
 program.parse();

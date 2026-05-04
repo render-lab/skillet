@@ -16,16 +16,38 @@ export function findProjectRoot(startDir: string): string {
 	}
 }
 
+/**
+ * Pick the canonical evals.json location for a skill directory.
+ *
+ * Skillet supports two layouts:
+ * - Flat (default for single-skill repos): `<skill>/evals.json` with fixtures
+ *   colocated under `<skill>/fixtures/`.
+ * - Nested (skill-creator convention): `<skill>/evals/evals.json` with
+ *   fixtures under `<skill>/evals/files/`.
+ *
+ * The flat layout takes precedence when both exist; the nested layout is used
+ * as a fallback when only it exists.
+ */
+function resolveEvalsFile(skillDir: string): string {
+	const flat = path.join(skillDir, "evals.json");
+	if (fs.existsSync(flat)) return flat;
+	const nested = path.join(skillDir, "evals", "evals.json");
+	if (fs.existsSync(nested)) return nested;
+	return flat;
+}
+
 /** Resolve paths within a skill directory by convention. */
 export function resolveSkillPaths(skillPath: string, evalsOverride?: string) {
 	const abs = path.resolve(skillPath);
 	const skillName = path.basename(abs);
 	const projectRoot = findProjectRoot(abs);
+	const evalsFile = evalsOverride ? path.resolve(evalsOverride) : resolveEvalsFile(abs);
 	return {
 		skillDir: abs,
 		skillName,
 		skillFile: path.join(abs, "SKILL.md"),
-		evalsFile: evalsOverride ? path.resolve(evalsOverride) : path.join(abs, "evals.json"),
+		evalsFile,
+		evalsDir: path.dirname(evalsFile),
 		resultsDir: path.join(projectRoot, ".skillet-evals", "results", skillName),
 	};
 }

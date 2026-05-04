@@ -126,7 +126,7 @@ async function runFixturesForSkill(opts: {
 		);
 	}
 	prompts.log.info(`Skill: ${pc.bold(paths.skillDir)}`);
-	const existing = filePaths.filter((f) => fs.existsSync(path.join(paths.skillDir, f)));
+	const existing = filePaths.filter((f) => fs.existsSync(path.join(paths.evalsDir, f)));
 	if (existing.length > 0) {
 		prompts.note(existing.map((f) => `  ${f}`).join("\n"), "Existing fixtures");
 		const overwrite = await prompts.confirm({
@@ -225,7 +225,7 @@ async function runFixturesForSkill(opts: {
 			prompts.log.warning(`No content generated for ${filePath} — skipping`);
 			continue;
 		}
-		const dest = path.join(paths.skillDir, filePath);
+		const dest = path.join(paths.evalsDir, filePath);
 		fs.mkdirSync(path.dirname(dest), { recursive: true });
 		fs.writeFileSync(dest, content.endsWith("\n") ? content : `${content}\n`);
 		prompts.log.success(dest);

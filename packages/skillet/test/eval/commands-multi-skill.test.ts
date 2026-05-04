@@ -181,7 +181,7 @@ describe("multi-skill eval commands", () => {
 	it("discovers all configured skills for validate and run when none are passed", async () => {
 		const skillA = await createSkill(tmpDir, "fixtures/skills/skill-a");
 		const skillB = await createSkill(tmpDir, "fixtures/skills/skill-b");
-		const configPath = path.join(tmpDir, "skillet.eval.yaml");
+		const configPath = path.join(tmpDir, "skillet.config.yaml");
 		await writeFile(
 			configPath,
 			[
@@ -214,7 +214,7 @@ describe("multi-skill eval commands", () => {
 		const skillWithoutEvals = path.join(tmpDir, "fixtures/skills/skill-without-evals");
 		await mkdir(skillWithoutEvals, { recursive: true });
 		await writeFile(path.join(skillWithoutEvals, "SKILL.md"), "# skill-without-evals\n");
-		const configPath = path.join(tmpDir, "skillet.eval.yaml");
+		const configPath = path.join(tmpDir, "skillet.config.yaml");
 		await writeFile(
 			configPath,
 			[

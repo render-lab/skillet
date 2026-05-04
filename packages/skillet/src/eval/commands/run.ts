@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import pc from "picocolors";
-import { extractSkillVersion } from "../../schemas/skill.js";
 import { parseFrontmatter } from "../../utils/frontmatter.js";
 import { hashString } from "../../utils/hash.js";
 import {
@@ -12,7 +11,7 @@ import {
 } from "../config.js";
 import { printResults } from "../report/console-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
-import { writeIntegrationMockManifests } from "../runner/integration-mocks.js";
+import { writeMockManifests } from "../runner/mocks.js";
 import { runOrchestrator } from "../runner/orchestrator.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { type EvalCase, EvalsFileSchema, getTurns } from "../schemas/evals.js";
@@ -22,6 +21,7 @@ import {
 	formatMissingSkillFileMessage,
 } from "../utils/cli-error.js";
 import { extractErrorMessage } from "../utils/error.js";
+import { extractSkillVersion } from "../utils/skill-meta.js";
 import { VERSION } from "../version.js";
 import { compareBenchmarks, printComparison } from "./compare.js";
 
@@ -61,6 +61,52 @@ function resolveSkillRunMetadata(skillContent: string) {
 		skillVersion: extractSkillVersion(frontmatter) ?? "unversioned",
 		skillSha256: hashString(skillContent),
 	};
+}
+
+/**
+ * Merge inline mock definitions from evals.json into the resolved config.
+ * Inline definitions add to (or override by name) the entries from
+ * `skillet.config.yaml`'s `mocks:` block.
+ */
+function mergeInlineMocks(
+	config: ReturnType<typeof loadConfig>,
+	evalsMocks: ReadonlyArray<string | { name: string; [key: string]: unknown }> | undefined,
+) {
+	if (!evalsMocks) return;
+	for (const entry of evalsMocks) {
+		if (typeof entry === "string") continue;
+		const { name, ...rest } = entry;
+		config.mocks[name] = rest as (typeof config.mocks)[string];
+	}
+}
+
+/**
+ * Validate that any mock names referenced from evals.json (top-level or per-eval)
+ * are configured either in `skillet.config.yaml` or as inline definitions.
+ */
+function assertReferencedMocksExist(
+	config: ReturnType<typeof loadConfig>,
+	evalsFile: {
+		mocks?: ReadonlyArray<string | { name: string }>;
+		evals: { mocks: Record<string, unknown> }[];
+	},
+) {
+	const known = new Set(Object.keys(config.mocks));
+	const missing = new Set<string>();
+	for (const entry of evalsFile.mocks ?? []) {
+		const name = typeof entry === "string" ? entry : entry.name;
+		if (!known.has(name)) missing.add(name);
+	}
+	for (const evalCase of evalsFile.evals) {
+		for (const name of Object.keys(evalCase.mocks)) {
+			if (!known.has(name)) missing.add(name);
+		}
+	}
+	if (missing.size > 0) {
+		throw new Error(
+			`Mock(s) referenced in evals.json but not defined in skillet.config.yaml: ${[...missing].join(", ")}.\nAdd them under \`mocks:\` in skillet.config.yaml or define them inline under the top-level \`mocks:\` array of evals.json.`,
+		);
+	}
 }
 
 export async function runRun(opts: RunOpts) {
@@ -175,13 +221,17 @@ async function runSingleSkill(
 	const evalsFile = EvalsFileSchema.parse(rawEvals);
 
 	const models = opts.model ?? evalsFile.models;
+	const providersOverride = opts.providers?.split(",") ?? evalsFile.providers;
 	const config = loadConfig({
 		configPath: opts.config,
-		providers: opts.providers?.split(","),
+		providers: providersOverride,
 		models,
 		runs: Number(opts.runs),
 		timeout: Number(opts.timeout),
 	});
+
+	mergeInlineMocks(config, evalsFile.mocks);
+	assertReferencedMocksExist(config, evalsFile);
 
 	let evals = evalsFile.evals;
 	if (opts.evalId) {
@@ -193,20 +243,29 @@ async function runSingleSkill(
 	}
 
 	if (
-		Object.keys(config.integrations).length > 0 &&
-		evals.some((evalCase) => Object.keys(evalCase.integrations).length > 0)
+		Object.keys(config.mocks).length > 0 &&
+		evals.some((evalCase) => Object.keys(evalCase.mocks).length > 0)
 	) {
-		await writeIntegrationMockManifests(config.integrations);
+		await writeMockManifests(config.mocks);
 	}
 
 	printRunHeader(opts, paths, evals, config, skillMeta);
 
-	const result = await runOrchestrator(config, evals, paths.skillDir, systemPrompt, {
+	const result = await runOrchestrator(config, evals, paths.evalsDir, systemPrompt, {
 		concurrency: opts.concurrency ? Number(opts.concurrency) : undefined,
 	});
 
 	printResults(result, evals, config.providers.length);
-	writeOutputs(result, config, evalsFile, evals, { ...opts, skill: opts.skill }, paths, skillMeta);
+	writeOutputs(
+		result,
+		config,
+		evalsFile,
+		evals,
+		{ ...opts, skill: opts.skill },
+		paths,
+		skillMeta,
+		skillContent,
+	);
 
 	if (opts.golden) {
 		if (!fs.existsSync(opts.golden)) {
@@ -275,6 +334,62 @@ function printRunHeader(
 	console.log("");
 }
 
+function hashSourceList(sources: string | string[] | undefined): string[] {
+	if (!sources) return [];
+	const list = Array.isArray(sources) ? sources : [sources];
+	return list.map((source) => {
+		if (/^https?:\/\//i.test(source)) return `url:${hashString(source)}`;
+		try {
+			const stat = fs.statSync(source);
+			if (stat.isDirectory()) return `dir:${hashString(source)}`;
+			return hashString(fs.readFileSync(source, "utf-8"));
+		} catch {
+			return `missing:${hashString(source)}`;
+		}
+	});
+}
+
+function buildReproducibilityManifest(
+	stamp: string,
+	config: ReturnType<typeof loadConfig>,
+	evals: { id: number }[],
+	opts: RunOpts & { skill: string },
+	paths: ReturnType<typeof resolveSkillPaths>,
+	skillMeta: ReturnType<typeof resolveSkillRunMetadata>,
+	skillContent: string,
+) {
+	return {
+		run_id: stamp,
+		skillet_version: VERSION,
+		skills: [
+			{
+				path: opts.skill,
+				content_sha256: hashString(skillContent),
+				skill_md_sha256: skillMeta.skillSha256,
+				skill_version: skillMeta.skillVersion,
+			},
+		],
+		providers: config.providers.map((p) => ({ name: p.name, model: p.model })),
+		grader: { name: config.grader.provider, model: config.grader.model },
+		mocks: Object.entries(config.mocks).map(([name, mock]) => ({
+			name,
+			openapi: mock.openapi,
+			mcpServer: mock.mcpServer,
+			openapi_sha256: hashSourceList(mock.openapi),
+			mcp_server_sha256: hashSourceList(mock.mcpServer),
+			expose: mock.expose,
+		})),
+		eval_config: {
+			evals_json_sha256: hashString(fs.readFileSync(paths.evalsFile, "utf-8")),
+			evals_run: evals.map((e) => e.id),
+			runs_per_provider: config.settings.runsPerProvider,
+			max_steps: config.settings.maxSteps,
+			timeout_seconds: config.settings.timeout,
+			temperature: config.settings.temperature,
+		},
+	};
+}
+
 function writeOutputs(
 	result: Awaited<ReturnType<typeof runOrchestrator>>,
 	config: ReturnType<typeof loadConfig>,
@@ -283,6 +398,7 @@ function writeOutputs(
 	opts: RunOpts & { skill: string },
 	paths: ReturnType<typeof resolveSkillPaths>,
 	skillMeta: ReturnType<typeof resolveSkillRunMetadata>,
+	skillContent: string,
 ) {
 	const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 	const resultsDir = paths.resultsDir;
@@ -301,6 +417,19 @@ function writeOutputs(
 	const jsonPath = path.join(resultsDir, `${stamp}.json`);
 	writeBenchmarkJson(result, config, meta, jsonPath);
 	console.log(`  ${pc.green("✓")} ${jsonPath}`);
+
+	const manifest = buildReproducibilityManifest(
+		stamp,
+		config,
+		evals,
+		opts,
+		paths,
+		skillMeta,
+		skillContent,
+	);
+	const manifestPath = path.join(resultsDir, `${stamp}.manifest.json`);
+	fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+	console.log(`  ${pc.green("✓")} ${manifestPath}`);
 
 	console.log(
 		`\n  ${pc.dim(`Run ${pc.bold(`skillet eval serve ${opts.skill}`)} to view results in the browser`)}\n`,
