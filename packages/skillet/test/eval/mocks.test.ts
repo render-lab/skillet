@@ -2,15 +2,15 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { MockIntegrationConfig } from "../../src/eval/config/schema.js";
+import type { MockConfig } from "../../src/eval/config/schema.js";
 import {
-	createIntegrationMockEnvironment,
-	summarizeIntegrationMockSources,
-	writeIntegrationMockManifests,
-} from "../../src/eval/runner/integration-mocks.js";
-import type { EvalIntegrationScenario } from "../../src/eval/schemas/evals.js";
+	createMockEnvironment,
+	summarizeMockSources,
+	writeMockManifests,
+} from "../../src/eval/runner/mocks.js";
+import type { EvalMockScenario } from "../../src/eval/schemas/evals.js";
 
-describe("createIntegrationMockEnvironment", () => {
+describe("createMockEnvironment", () => {
 	const dirs: string[] = [];
 
 	afterEach(async () => {
@@ -19,7 +19,7 @@ describe("createIntegrationMockEnvironment", () => {
 	});
 
 	async function makeSources() {
-		const dir = await mkdtemp(path.join(tmpdir(), "skillet-integration-mocks-"));
+		const dir = await mkdtemp(path.join(tmpdir(), "skillet-mocks-"));
 		dirs.push(dir);
 		const openapiPath = path.join(dir, "openapi.json");
 		const mcpDir = path.join(dir, "mcp", "tools");
@@ -60,8 +60,8 @@ describe("createIntegrationMockEnvironment", () => {
 		return { openapiPath, mcpDir: path.dirname(mcpDir) };
 	}
 
-	it("returns an inert environment when no scenarios reference integrations", async () => {
-		const env = await createIntegrationMockEnvironment({}, {});
+	it("returns an inert environment when no scenarios reference mocks", async () => {
+		const env = await createMockEnvironment({}, {});
 
 		expect(env.tools).toEqual([]);
 		expect(env.handlers).toEqual({});
@@ -73,10 +73,10 @@ describe("createIntegrationMockEnvironment", () => {
 
 	it("serves OpenAPI-derived routes from scenario state", async () => {
 		const { openapiPath } = await makeSources();
-		const config: Record<string, MockIntegrationConfig> = {
+		const config: Record<string, MockConfig> = {
 			render: { openapi: openapiPath, expose: ["http"], tools: [] },
 		};
-		const scenario: Record<string, EvalIntegrationScenario> = {
+		const scenario: Record<string, EvalMockScenario> = {
 			render: {
 				state: {
 					services: [{ id: "svc_123", name: "api", status: "unhealthy" }],
@@ -85,7 +85,7 @@ describe("createIntegrationMockEnvironment", () => {
 			},
 		};
 
-		const env = await createIntegrationMockEnvironment(config, scenario);
+		const env = await createMockEnvironment(config, scenario);
 		try {
 			const baseUrl = env.instructions[0]?.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
 			expect(baseUrl).toBeDefined();
@@ -118,7 +118,7 @@ describe("createIntegrationMockEnvironment", () => {
 				"",
 			].join("\n"),
 		);
-		const manifests = await writeIntegrationMockManifests(
+		const manifests = await writeMockManifests(
 			{
 				render: { openapi: openapiPath, expose: ["http"], tools: [] },
 			},
@@ -144,7 +144,7 @@ describe("createIntegrationMockEnvironment", () => {
 				"",
 			].join("\n"),
 		);
-		const manifests = await writeIntegrationMockManifests(
+		const manifests = await writeMockManifests(
 			{
 				render: { openapi: openapiPath, expose: ["http"], tools: [] },
 			},
@@ -156,10 +156,10 @@ describe("createIntegrationMockEnvironment", () => {
 
 	it("imports MCP descriptor tools and resolves responses from scenario state", async () => {
 		const { mcpDir } = await makeSources();
-		const config: Record<string, MockIntegrationConfig> = {
+		const config: Record<string, MockConfig> = {
 			render: { mcpServer: mcpDir, expose: ["tools"], tools: [] },
 		};
-		const scenario: Record<string, EvalIntegrationScenario> = {
+		const scenario: Record<string, EvalMockScenario> = {
 			render: {
 				state: {
 					services: [{ id: "svc_123", name: "api" }],
@@ -170,7 +170,7 @@ describe("createIntegrationMockEnvironment", () => {
 			},
 		};
 
-		const env = await createIntegrationMockEnvironment(config, scenario);
+		const env = await createMockEnvironment(config, scenario);
 		try {
 			expect(env.tools.map((tool) => tool.name)).toContain("list_services");
 			await expect(env.handlers.list_services?.({})).resolves.toEqual([
@@ -198,11 +198,11 @@ describe("createIntegrationMockEnvironment", () => {
 				"",
 			].join("\n"),
 		);
-		const config: Record<string, MockIntegrationConfig> = {
+		const config: Record<string, MockConfig> = {
 			render: { mcpServer: dir, expose: ["tools"], tools: [] },
 		};
 
-		const manifests = await writeIntegrationMockManifests(config, dir);
+		const manifests = await writeMockManifests(config, dir);
 
 		expect(manifests[0]?.tools).toEqual([
 			expect.objectContaining({
@@ -217,13 +217,13 @@ describe("createIntegrationMockEnvironment", () => {
 
 	it("writes materialized manifests and summarizes from them", async () => {
 		const { openapiPath, mcpDir } = await makeSources();
-		const manifestRoot = await mkdtemp(path.join(tmpdir(), "skillet-integration-manifests-"));
+		const manifestRoot = await mkdtemp(path.join(tmpdir(), "skillet-mock-manifests-"));
 		dirs.push(manifestRoot);
-		const config: Record<string, MockIntegrationConfig> = {
+		const config: Record<string, MockConfig> = {
 			render: { openapi: openapiPath, mcpServer: mcpDir, expose: ["http", "tools"], tools: [] },
 		};
 
-		const manifests = await writeIntegrationMockManifests(config, manifestRoot);
+		const manifests = await writeMockManifests(config, manifestRoot);
 		const manifestPath = path.join(manifestRoot, "render", "manifest.json");
 
 		expect(manifests[0]).toMatchObject({
@@ -238,10 +238,10 @@ describe("createIntegrationMockEnvironment", () => {
 			expose: ["http", "tools"],
 		});
 
-		const summaries = await summarizeIntegrationMockSources({}, manifestRoot);
+		const summaries = await summarizeMockSources({}, manifestRoot);
 		expect(summaries).toEqual([]);
 
-		const configBackedSummaries = await summarizeIntegrationMockSources(config, manifestRoot);
+		const configBackedSummaries = await summarizeMockSources(config, manifestRoot);
 		expect(configBackedSummaries[0]).toMatchObject({
 			name: "render",
 			httpRoutes: expect.arrayContaining([expect.objectContaining({ key: "GET /services/{id}" })]),

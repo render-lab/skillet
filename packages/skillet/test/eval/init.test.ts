@@ -48,7 +48,6 @@ describe("runInit", () => {
 		multiselectMock.mockResolvedValueOnce(["openai"]);
 		selectMock.mockResolvedValue("gpt-5.4");
 		textMock.mockResolvedValueOnce("");
-		confirmMock.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
 	});
 
 	afterEach(async () => {
@@ -62,6 +61,11 @@ describe("runInit", () => {
 	});
 
 	it("can scaffold a GitHub Actions workflow for evals", async () => {
+		confirmMock
+			.mockResolvedValueOnce(false)
+			.mockResolvedValueOnce(true)
+			.mockResolvedValueOnce(false);
+
 		await runInit();
 
 		const workflow = await readFile(
@@ -74,5 +78,39 @@ describe("runInit", () => {
 		expect(workflow).toContain("pnpm skillet:run");
 		expect(workflow).toContain("Comment Skillet summary on PR");
 		expect(workflow).toContain("skillet-eval-results");
+		expect(workflow).toContain("contents: read");
+		expect(workflow).not.toContain("Publish report to eval-reports branch");
+		expect(workflow).not.toContain("SKILLET_REPORT_BASE_URL");
+	});
+
+	it("scaffolds Render-hosted reports when opted in", async () => {
+		confirmMock
+			.mockResolvedValueOnce(false)
+			.mockResolvedValueOnce(true)
+			.mockResolvedValueOnce(true);
+
+		await runInit();
+
+		const workflow = await readFile(
+			path.join(tmpDir, ".github/workflows/skillet-evals.yml"),
+			"utf-8",
+		);
+		expect(workflow).toContain("contents: write");
+		expect(workflow).toContain("Publish report to eval-reports branch");
+		expect(workflow).toContain("SKILLET_REPORT_BASE_URL");
+		expect(workflow).toContain("/pr-");
+
+		const renderYaml = await readFile(path.join(tmpDir, "render.yaml"), "utf-8");
+		expect(renderYaml).toContain("name: skillet-reports");
+		expect(renderYaml).toContain("branch: eval-reports");
+		expect(renderYaml).toContain("staticPublishPath: .");
+
+		const cleanup = await readFile(
+			path.join(tmpDir, ".github/workflows/skillet-evals-cleanup.yml"),
+			"utf-8",
+		);
+		expect(cleanup).toContain("Skillet evals cleanup");
+		expect(cleanup).toContain("types: [closed]");
+		expect(cleanup).toContain("eval-reports");
 	});
 });

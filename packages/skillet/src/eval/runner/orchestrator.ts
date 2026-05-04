@@ -15,7 +15,7 @@ import { extractErrorMessage } from "../utils/error.js";
 import { mean, sleep, stddev } from "../utils/math.js";
 import { rateColor } from "../utils/rate.js";
 import { runAgentLoop } from "./agent-loop.js";
-import { createIntegrationMockEnvironment } from "./integration-mocks.js";
+import { createMockEnvironment } from "./mocks.js";
 import { Spinner } from "./spinner.js";
 import { collectOutputFiles, createToolHandlers, defaultTools, seedSandbox } from "./tools.js";
 import { createTurnChecker } from "./turn-check.js";
@@ -139,7 +139,7 @@ function formatSuccessLine(
 export async function runOrchestrator(
 	config: ResolvedConfig,
 	evals: EvalCase[],
-	skillDir: string,
+	fixturesDir: string,
 	systemPrompt: string,
 	opts: {
 		concurrency?: number;
@@ -181,14 +181,11 @@ export async function runOrchestrator(
 		const evalTimeoutMs = config.settings.timeout * 1000;
 		const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), "skillet-eval-"));
 		let lastDetail = "starting…";
-		let integrationEnv: Awaited<ReturnType<typeof createIntegrationMockEnvironment>> | undefined;
+		let mockEnv: Awaited<ReturnType<typeof createMockEnvironment>> | undefined;
 
 		try {
-			seedSandbox(sandboxDir, skillDir, entry.evalCase.files);
-			integrationEnv = await createIntegrationMockEnvironment(
-				config.integrations,
-				entry.evalCase.integrations,
-			);
+			seedSandbox(sandboxDir, fixturesDir, entry.evalCase.files);
+			mockEnv = await createMockEnvironment(config.mocks, entry.evalCase.mocks);
 			const id = taskId(entry);
 			const updateDetail = (detail: string) => {
 				lastDetail = detail;
@@ -202,14 +199,14 @@ export async function runOrchestrator(
 					const agentRun = await runAgentLoop({
 						provider: entry.provider,
 						system:
-							integrationEnv && integrationEnv.instructions.length > 0
-								? `${systemPrompt}\n\n<integration_mocks>\n${integrationEnv.instructions.join("\n")}\n</integration_mocks>`
+							mockEnv && mockEnv.instructions.length > 0
+								? `${systemPrompt}\n\n<mocks>\n${mockEnv.instructions.join("\n")}\n</mocks>`
 								: systemPrompt,
 						turns,
-						tools: [...defaultTools, ...(integrationEnv?.tools ?? [])],
+						tools: [...defaultTools, ...(mockEnv?.tools ?? [])],
 						toolHandlers: {
 							...createToolHandlers(sandboxDir, config.settings.timeout),
-							...(integrationEnv?.handlers ?? {}),
+							...(mockEnv?.handlers ?? {}),
 						},
 						maxSteps: config.settings.maxSteps,
 						temperature: config.settings.temperature,
@@ -219,7 +216,7 @@ export async function runOrchestrator(
 
 					const outputFiles = [
 						...collectOutputFiles(sandboxDir),
-						...(integrationEnv?.outputFiles() ?? []),
+						...(mockEnv?.outputFiles() ?? []),
 					];
 
 					updateDetail("grading…");
@@ -266,7 +263,7 @@ export async function runOrchestrator(
 				() => `${taskLabel(entry)} — ${lastDetail}`,
 			);
 		} finally {
-			await integrationEnv?.cleanup();
+			await mockEnv?.cleanup();
 			fs.rmSync(sandboxDir, { recursive: true, force: true });
 		}
 	}

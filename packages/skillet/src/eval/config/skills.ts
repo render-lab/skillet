@@ -115,7 +115,7 @@ export function resolveSkillSelection(
 	const discovered = discoverSkillsFromRoots(skillRoots);
 	if (discovered.length === 0) {
 		throw new Error(
-			'No skills discovered. Configure "skills.roots" in skillet.eval.yaml or pass skill paths explicitly.',
+			'No skills discovered. Configure "skills.roots" in skillet.config.yaml or pass skill paths explicitly.',
 		);
 	}
 

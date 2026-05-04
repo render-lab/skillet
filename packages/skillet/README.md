@@ -1,6 +1,6 @@
 # skillet
 
-Toolkit for evaluating AI agent skills across model providers. Also includes utilities for reproducible skill installs and runtime-specific context emission.
+Multi-provider skill evals with integration mocks. Run real agent loops against any directory with a `SKILL.md`, mock external APIs and MCP tools with deterministic stubs, grade transcripts with an LLM judge, and write a per-run input manifest so the same configuration can be re-run in CI.
 
 ## Install
 
@@ -10,121 +10,125 @@ pnpm add -D @render-lab/skillet
 
 Requires Node.js 20+.
 
+## Quick start
+
+```bash
+skillet eval init                  # interactive setup → skillet.config.yaml
+skillet mock import openapi ./fixtures/render-openapi.json --name render
+skillet eval run ./my-skill        # multi-provider eval run
+```
+
+The first command writes `skillet.config.yaml` with your providers and grader. The second imports an OpenAPI spec into the config's `mocks:` block and writes a mock manifest under `.skillet-evals/mocks/`. The third runs every eval case in `./my-skill/evals.json` against every configured provider, writes `<stamp>.json` (benchmark) and `<stamp>.manifest.json` (input manifest) under `.skillet-evals/results/<skill>/`, and prints a side-by-side summary.
+
 ## Eval commands
 
 ```bash
-skillet eval init
-skillet eval generate ./my-skill
-skillet eval validate ./my-skill
-skillet eval run ./my-skill
-skillet eval report
-skillet eval serve ./my-skill
-skillet eval compare golden.json current.json
+skillet eval init                  # interactive setup → skillet.config.yaml
+skillet eval scaffold              # create a SKILL.md + evals.json starter
+skillet eval validate              # check eval definitions
+skillet eval generate ./my-skill   # generate eval cases from a SKILL.md
+skillet eval fixtures ./my-skill   # generate fixture files referenced by evals
+skillet eval run                   # run evals across configured providers
+skillet eval report                # render results as static HTML
+skillet eval serve ./my-skill      # local UI for browsing results
+skillet eval compare a.json b.json # diff two benchmark JSON files
 ```
 
-`skillet eval` runs a sandboxed agent loop against a skill directory, grades the result with an LLM judge, reads config from `skillet.eval.yaml` by default, and writes results to `.skillet-evals/results/<skill-name>/`.
+`skillet eval run` runs a sandboxed agent loop against a skill directory, grades the result with an LLM judge, reads config from `skillet.config.yaml` by default, and writes results to `.skillet-evals/results/<skill-name>/`.
 
-`skillet eval report` writes a static HTML report to `.skillet-evals/report/`.
+`skillet eval init` can also scaffold `.github/workflows/skillet-evals.yml` with validation, model eval runs, GitHub Actions summaries, PR comments, raw result artifacts, and static HTML report artifacts. It can optionally write a `render.yaml` to host the report on Render — the workflow then publishes each PR's report to an `eval-reports` branch under `pr-<N>/`, and the PR comment links to `<your-service>.onrender.com/pr-<N>/` when `SKILLET_REPORT_BASE_URL` is set.
 
-`skillet eval init` can also scaffold `.github/workflows/skillet-evals.yml` with validation, model eval runs, GitHub Actions summaries, PR comments, raw result artifacts, and static HTML report artifacts.
-
-## Core commands
+## Mock commands
 
 ```bash
-skillet init
-skillet add anthropics/skills/docx@^2.1.0
-skillet install
-skillet emit --target cursor
-skillet update
-skillet status
+skillet mock import openapi <spec> # import an OpenAPI spec as a mock
+skillet mock import mcp <repo>     # import an MCP server repo as a mock
 ```
 
-### `skillet init`
+`skillet mock import` adds an entry to `skillet.config.yaml` under `mocks:` and writes `.skillet-evals/mocks/<name>/manifest.json` with the imported HTTP routes and tool descriptors. Pass `--name` to override the default name (derived from the source basename) and `--config` to point at a non-default config file.
 
-Scaffold a `skills.json` manifest in the current project. Interactive prompts collect the project name, target runtimes, and injection strategy.
+## Skill layout
 
-### `skillet add <spec...>`
+Skillet recognizes both layouts a skill might use for evals:
 
-Add one or more skill dependencies in `owner/repo/skill-name[@version]` format.
+- **Flat** (default): `<skill>/evals.json` and `<skill>/fixtures/`.
+- **Nested** (skill-creator convention): `<skill>/evals/evals.json` and `<skill>/evals/files/`.
 
-```bash
-skillet add anthropics/skills/docx
-skillet add anthropics/skills/docx@^2.1.0
-skillet add render-com/skills/deploy-workflow@latest
-```
+The flat layout takes precedence when both exist. Fixture paths in `evals.json` resolve relative to the directory containing `evals.json`.
 
-This resolves each skill from GitHub, updates `skills.json`, and refreshes the lockfile.
-
-### `skillet install`
-
-Resolve all dependencies from `skills.json`, fetch them, and write `skills.lock`.
-
-Skills are cached locally at `~/.skillet/cache/` and verified by SHA256.
-
-### `skillet emit`
-
-Assemble context from installed skills and write output files for each target runtime.
-
-```bash
-skillet emit
-skillet emit --target cursor
-skillet emit --target claude-code,codex
-```
-
-### `skillet status`
-
-Show installed skills, versions, lockfile state, and any stored eval metadata.
-
-### Integration Mocks
-
-Use integration mocks when a skill expects access to an external API or MCP server, but you want evals to stay local, deterministic, and safe. Instead of calling a real account, Skillet builds a per-run mock environment from source definitions you provide during `skillet eval init`.
-
-This feature is opt-in. If `skillet.eval.yaml` has no `integrations` block, or if an eval case does not reference an integration, eval behavior is unchanged.
-
-#### Configure Sources During Init
-
-Run `skillet eval init` and answer yes when prompted to configure integration mocks. For each integration, provide:
-
-- an integration name, such as `render`, `stripe`, or `github`
-- an OpenAPI JSON or YAML spec path or URL
-- an MCP server repo or local path
-- which surfaces to expose: `http`, `tools`, or both
-
-Skillet writes reusable integration sources to `skillet.eval.yaml`:
+## `skillet.config.yaml`
 
 ```yaml
 providers:
+  - name: anthropic
+    model: claude-sonnet-4-6
+    apiKey: ${ANTHROPIC_API_KEY}
   - name: openai
     model: gpt-5.4
     apiKey: ${OPENAI_API_KEY}
 
-integrations:
+# Short form is also supported when the model id is enough to infer the provider:
+# providers:
+#   - claude-sonnet-4-6
+#   - gpt-5.4
+
+grader:
+  provider: anthropic
+  model: claude-sonnet-4-6
+
+skills:
+  roots:
+    - ./skills
+
+mocks:
   render:
     openapi: ./fixtures/render-openapi.json
     mcpServer: ./fixtures/render-mcp-server
     expose: [http, tools]
+
+settings:
+  maxSteps: 20
+  timeout: 300
+  runsPerProvider: 1
+  temperature: 0
 ```
 
-Keep reusable source information in `skillet.eval.yaml`. Put per-test data in `evals.json`.
+API keys are also read from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). When no `skillet.config.yaml` is present, Skillet falls back to env-var-only auto-detection.
 
-Skillet also materializes each configured integration under `.skillet-evals/integrations/<name>/manifest.json`. The manifest records the imported OpenAPI route keys, MCP-style tool keys, source paths, and import errors. `skillet eval init`, `skillet eval generate`, and `skillet eval run` refresh this manifest from the configured sources.
+## Mocks
 
-`skillet eval generate` also reads configured integration sources. When integrations are present, the generator prompt includes imported OpenAPI route keys and MCP-style tool keys so generated evals can include matching scenario `state` and `overrides`.
+Use mocks when a skill expects access to an external API or MCP server, but you want evals to stay local, deterministic, and safe. Skillet builds a per-run mock environment from sources you import.
 
-#### Add Scenario Data To Evals
+### Configure a mock
 
-Each eval case can opt in to one or more configured integrations. The `state` object describes the account, project, database, or API state for that scenario. The `overrides` object maps imported routes or tools to mock responses.
+Import an OpenAPI spec or MCP server repo with `skillet mock import`:
+
+```bash
+skillet mock import openapi ./fixtures/render-openapi.json --name render
+skillet mock import mcp ./fixtures/render-mcp-server --name render-tools
+```
+
+Each call:
+
+1. Adds an entry to `skillet.config.yaml` under `mocks:`.
+2. Writes a materialized manifest to `.skillet-evals/mocks/<name>/manifest.json` recording the imported HTTP route keys, MCP-style tool keys, source paths, and any import errors.
+
+`skillet eval init`, `skillet eval generate`, and `skillet eval run` refresh this manifest from the configured sources whenever they're invoked.
+
+### Reference a mock from an eval
+
+Each eval case can opt in to one or more configured mocks. The `state` object describes the account, project, database, or API state for that scenario. The `overrides` object maps imported routes or tools to mock responses.
 
 ```json
 {
   "id": 1,
   "prompt": "Debug why my service is unhealthy.",
   "expected_output": "Find the unhealthy service and explain the failed deploy.",
-  "integrations": {
+  "mocks": {
     "render": {
       "state": {
         "services": [{ "id": "svc_123", "name": "api", "status": "unhealthy" }],
-        "deploys": [{ "id": "dep_123", "serviceId": "svc_123", "status": "failed" }]
+        "deploys":  [{ "id": "dep_123", "serviceId": "svc_123", "status": "failed" }]
       },
       "overrides": {
         "GET /services/{id}": { "responseFromState": "services[id]" },
@@ -143,44 +147,44 @@ During the eval run, Skillet starts an isolated mock environment for that one ag
 
 - the local mock HTTP base URL, if `http` is exposed
 - imported MCP-style tools, if `tools` is exposed
-- the normal sandbox tools (`bash`, `read_file`, `write_file`, and `list_directory`)
+- the normal sandbox tools (`bash`, `read_file`, `write_file`, `list_directory`)
 
-The integration state snapshot is included in grading context, so assertions can reference the final mock state.
+The mock state snapshot is included in grading context so assertions can reference the final state. Parallel evals do not share state.
 
-#### OpenAPI Import
+### Top-level mocks/providers in `evals.json`
+
+An `evals.json` file can declare top-level `providers` (filters which configured providers run for this skill) and `mocks` (a list of mock names this skill depends on, optionally with inline definitions):
+
+```json
+{
+  "skill_name": "code-review",
+  "providers": ["openai", "anthropic"],
+  "mocks": [
+    "render",
+    { "name": "github", "openapi": "./fixtures/github.json" }
+  ],
+  "evals": [ ... ]
+}
+```
+
+String entries reference mocks defined in `skillet.config.yaml`. Object entries are inline definitions — they're merged into `config.mocks` for the duration of the run. If an eval references a mock name that's not configured anywhere, `skillet eval run` exits with an error.
+
+### OpenAPI import
 
 When you expose `http`, Skillet reads the configured OpenAPI spec and creates local routes for the operations under `paths`.
-
-Supported behavior:
 
 - JSON and YAML OpenAPI documents are supported.
 - The file must be the OpenAPI document itself, with `openapi` and `paths`. Do not point `openapi` at an `oapi-codegen` config file.
 - `GET`, `POST`, `PUT`, `PATCH`, and `DELETE` operations are imported.
 - Path parameters such as `/services/{id}` are matched against incoming requests.
-- If an operation includes an `application/json` example response, Skillet can use it as the default response.
-- Eval-level overrides can replace the default response for a specific operation.
-- For `GET` routes, Skillet can also resolve common collection state automatically. For example, `/services/{id}` can resolve an item from `state.services`.
+- If an operation includes an `application/json` example response, Skillet uses it as the default response.
+- For `GET` routes, Skillet can resolve common collection state automatically. For example, `/services/{id}` resolves an item from `state.services`.
 
-Route override keys use this format:
+Route override keys use the format `METHOD /path/{param}`.
 
-```text
-METHOD /path/{param}
-```
+### MCP-style tool import
 
-For example:
-
-```json
-{
-  "overrides": {
-    "GET /services/{id}": { "responseFromState": "services[id]" },
-    "GET /deploys": { "responseFromState": "deploys" }
-  }
-}
-```
-
-#### MCP-Style Tool Import
-
-When you expose `tools`, Skillet imports tool definitions from the configured MCP server source. The source can be a GitHub repo URL, a local repo/path with a README tool list, or a directory of tool descriptor JSON files. README import supports tool lists in the common format `- **tool_name** - Description` followed by parameter bullets.
+When you expose `tools`, Skillet imports tool definitions from the configured MCP server source. The source can be a GitHub repo URL, a local repo/path with a README tool list, or a directory of tool descriptor JSON files. README import supports the format `- **tool_name** - Description` followed by parameter bullets.
 
 Example descriptor JSON:
 
@@ -200,27 +204,12 @@ Example descriptor JSON:
 }
 ```
 
-Tool override keys use this format:
+Tool override keys use the format `tool:<tool_name>`.
 
-```text
-tool:<tool_name>
-```
-
-For example:
-
-```json
-{
-  "overrides": {
-    "tool:list_services": { "responseFromState": "services" },
-    "tool:get_service": { "responseFromState": "services[id]" }
-  }
-}
-```
-
-Skillet also supports explicit tool definitions in `skillet.eval.yaml` for cases where a repo does not provide descriptor JSON:
+You can also declare explicit tools in `skillet.config.yaml` for cases where a repo does not provide descriptor JSON:
 
 ```yaml
-integrations:
+mocks:
   billing:
     expose: [tools]
     tools:
@@ -229,104 +218,43 @@ integrations:
         responseFromState: invoices
 ```
 
-#### State Expressions
+### State expressions
 
-Use `responseFromState` to return data from the eval scenario state.
-
-Supported forms:
+Use `responseFromState` to return data from the eval scenario state:
 
 - `services` returns `state.services`
 - `services[id]` finds an item in `state.services` whose `id` matches the route or tool argument named `id`
 - `deploys[serviceId]` finds an item whose `id` or `serviceId` matches the argument named `serviceId`
 
-For static responses, use `response`:
+For static responses, use `response: { ... }` instead of `responseFromState`.
+
+## Per-run input manifest
+
+Every `skillet eval run` writes `<stamp>.manifest.json` next to the benchmark JSON. It records every input that shaped the run:
 
 ```json
 {
-  "overrides": {
-    "tool:get_selected_workspace": {
-      "response": { "id": "ws_123", "name": "Production" }
-    }
+  "run_id": "2026-05-03T17-04-12",
+  "skillet_version": "0.2.0",
+  "skills": [
+    { "path": "./my-skill", "content_sha256": "…", "skill_version": "1.0.0" }
+  ],
+  "providers": [
+    { "name": "anthropic", "model": "claude-sonnet-4-6" },
+    { "name": "openai",    "model": "gpt-5.4" }
+  ],
+  "mocks": [
+    { "name": "render", "openapi": "./fixtures/render-openapi.json", "openapi_sha256": ["…"] }
+  ],
+  "eval_config": {
+    "evals_json_sha256": "…",
+    "evals_run": [1, 2, 3],
+    "runs_per_provider": 1
   }
 }
 ```
 
-#### Compatibility Notes
-
-Integration mocks do not use your real MCP tools or real external account. They are generated from the configured sources and scenario data for each eval run.
-
-Each eval run gets its own isolated mock state and local HTTP server. Parallel evals do not share mock state.
-
-The generated manifests are inspectable build artifacts. Commit them only if you want a stable imported surface in version control; otherwise, regenerate them from `skillet.eval.yaml`.
-
-## Manifest (`skills.json`)
-
-```json
-{
-  "name": "my-project",
-  "version": "1.0.0",
-  "skills": {
-    "anthropics/skills/docx": "^2.1.0",
-    "render-com/skills/deploy-workflow": "latest"
-  },
-  "config": {
-    "target": ["cursor", "claude-code"],
-    "inject": "eager"
-  }
-}
-```
-
-### Skill specifiers
-
-Skills are identified as `owner/repo/skill-name`, mirroring the skills.sh convention. Version ranges follow semver such as `^1.0.0`, `~1.2.0`, `1.0.0`, and `latest`.
-
-### Injection strategies
-
-| Strategy | Behavior |
-| --- | --- |
-| `eager` | All skill content injected upfront. |
-| `lazy` | Only metadata injected; full content loads on demand. |
-| `tiered` | Per-skill override in the manifest. |
-
-For tiered injection, use an object instead of a version string:
-
-```json
-{
-  "skills": {
-    "owner/repo/core-skill": { "version": "^1.0.0", "inject": "eager" },
-    "owner/repo/reference-skill": { "version": "^1.0.0", "inject": "lazy" }
-  }
-}
-```
-
-## Lockfile (`skills.lock`)
-
-Pins every dependency to a content-addressed SHA256. Commit this file for reproducible agent behavior.
-
-```json
-{
-  "lockfileVersion": 1,
-  "resolved": {
-    "anthropics/skills/docx@2.1.3": {
-      "sha256": "e3b0c44298fc1c149afb...",
-      "source": "https://github.com/anthropics/skills/tree/abc123/docx",
-      "commitSha": "abc123def456"
-    }
-  }
-}
-```
-
-## Emit targets
-
-| Target | Output | Format |
-| --- | --- | --- |
-| `cursor` | `.cursor/rules/<skill>.mdc` | YAML frontmatter + markdown |
-| `cursor-legacy` | `.cursorrules` | Plain markdown |
-| `claude-code` | `CLAUDE.md` | Plain markdown |
-| `codex` | `.agents/skills/<skill>/SKILL.md` | Standard `SKILL.md` |
-| `windsurf` | `.windsurfrules` | Plain markdown |
-| `cline` | `.clinerules` | Plain markdown |
-| `generic` | `agent-context.md` | Plain markdown |
+LLM calls aren't bit-reproducible, so a replay won't be byte-identical — but if results drift, the manifest pinpoints which input changed (skill content, mock spec, eval case, provider).
 
 ## License
 

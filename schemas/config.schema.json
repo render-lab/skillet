@@ -1,16 +1,26 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "SkilletEvalConfig",
-  "description": "Schema for skillet.eval.yaml configuration files",
+  "title": "SkilletConfig",
+  "description": "Schema for skillet.config.yaml configuration files",
   "type": "object",
   "required": ["providers"],
   "properties": {
     "providers": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/ProviderConfig" }
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          { "$ref": "#/$defs/ProviderConfig" }
+        ]
+      }
     },
     "grader": { "$ref": "#/$defs/GraderConfig" },
+    "skills": { "$ref": "#/$defs/SkillDiscoveryConfig" },
+    "mocks": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/MockConfig" }
+    },
     "settings": {
       "type": "object",
       "properties": {
@@ -64,6 +74,56 @@
           "enum": ["anthropic", "openai", "google"]
         },
         "model": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SkillDiscoveryConfig": {
+      "type": "object",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MockConfig": {
+      "type": "object",
+      "properties": {
+        "openapi": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "mcpServer": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "expose": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["http", "tools"] },
+          "default": ["http", "tools"]
+        },
+        "tools": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MockToolConfig" },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "MockToolConfig": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string", "default": "Mock tool" },
+        "parameters": { "type": "object" },
+        "response": {},
+        "responseFromState": { "type": "string" }
       },
       "additionalProperties": false
     }

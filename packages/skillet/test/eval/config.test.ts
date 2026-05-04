@@ -27,7 +27,7 @@ describe("loadConfig", () => {
 	});
 
 	it("throws a helpful error when an explicit config path does not exist", () => {
-		expect(() => loadConfig({ configPath: "/definitely/missing/skillet.eval.yaml" })).toThrow(
+		expect(() => loadConfig({ configPath: "/definitely/missing/skillet.config.yaml" })).toThrow(
 			/Config file not found/,
 		);
 	});
@@ -115,11 +115,11 @@ describe("loadConfig", () => {
 			path.join(tmpDir, "skills"),
 			path.resolve(tmpDir, "../shared-skills"),
 		]);
-		expect(config.integrations).toEqual({});
+		expect(config.mocks).toEqual({});
 	});
 
-	it("resolves integration mock sources relative to the config file", async () => {
-		const configPath = path.join(tmpDir, "nested/custom.eval.yaml");
+	it("resolves mock sources relative to the config file", async () => {
+		const configPath = path.join(tmpDir, "nested/custom.config.yaml");
 		await mkdir(path.dirname(configPath), { recursive: true });
 		await writeFile(
 			configPath,
@@ -128,7 +128,7 @@ describe("loadConfig", () => {
 				"  - name: openai",
 				"    model: gpt-5.4",
 				"    apiKey: ${OPENAI_API_KEY}",
-				"integrations:",
+				"mocks:",
 				"  render:",
 				"    openapi: ./fixtures/openapi.json",
 				"    mcpServer: https://github.com/example/mcp-server",
@@ -140,7 +140,7 @@ describe("loadConfig", () => {
 
 		const config = loadConfig({ configPath });
 
-		expect(config.integrations.render).toMatchObject({
+		expect(config.mocks.render).toMatchObject({
 			openapi: path.join(tmpDir, "nested/fixtures/openapi.json"),
 			mcpServer: "https://github.com/example/mcp-server",
 			expose: ["http", "tools"],

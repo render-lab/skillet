@@ -29,12 +29,19 @@ function detectProviders(): ProviderConfig[] {
 	return providers;
 }
 
+/** Coerce a short-form provider entry (model id string) into a full ProviderConfig. */
+function normalizeProviderEntry(entry: string | ProviderConfig): ProviderConfig {
+	if (typeof entry !== "string") return entry;
+	const name = inferProvider(entry);
+	return { name, model: entry };
+}
+
 /**
  * Load config from YAML file (if present), merge with env var auto-detection,
  * and apply CLI overrides. Returns a fully resolved config with API keys.
  */
 export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
-	const configPath = overrides.configPath ?? "skillet.eval.yaml";
+	const configPath = overrides.configPath ?? "skillet.config.yaml";
 	const resolvedConfigPath = path.resolve(configPath);
 	let fileConfig: Config | undefined;
 
@@ -52,7 +59,8 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 
 	const configDir = fileConfig ? path.dirname(resolvedConfigPath) : process.cwd();
 
-	let providers = fileConfig?.providers ?? detectProviders();
+	let providers: ProviderConfig[] =
+		fileConfig?.providers.map(normalizeProviderEntry) ?? detectProviders();
 
 	if (overrides.providers?.length) {
 		providers = providers.filter((p) => overrides.providers?.includes(p.name));
@@ -97,7 +105,7 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 		throw new Error(
 			"No providers configured. Set API keys in the environment " +
 				"(ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY) " +
-				"or create a skillet.eval.yaml config file.",
+				"or create a skillet.config.yaml config file.",
 		);
 	}
 
@@ -114,8 +122,8 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 	if (overrides.runs) settings.runsPerProvider = overrides.runs;
 	if (overrides.timeout) settings.timeout = overrides.timeout;
 
-	const integrations = Object.fromEntries(
-		Object.entries(fileConfig?.integrations ?? {}).map(([name, integration]) => {
+	const mocks = Object.fromEntries(
+		Object.entries(fileConfig?.mocks ?? {}).map(([name, mock]) => {
 			const resolveOne = (value: string) =>
 				/^https?:\/\//i.test(value) ? value : path.resolve(configDir, value);
 			const resolveMaybeMany = (value: string | string[] | undefined) => {
@@ -125,9 +133,9 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 			return [
 				name,
 				{
-					...integration,
-					openapi: resolveMaybeMany(integration.openapi),
-					mcpServer: resolveMaybeMany(integration.mcpServer),
+					...mock,
+					openapi: resolveMaybeMany(mock.openapi),
+					mcpServer: resolveMaybeMany(mock.mcpServer),
 				},
 			];
 		}),
@@ -138,6 +146,6 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 		grader: { ...graderSource, apiKey: graderKey },
 		skillRoots: (fileConfig?.skills.roots ?? []).map((root) => path.resolve(configDir, root)),
 		settings,
-		integrations,
+		mocks,
 	};
 }

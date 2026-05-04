@@ -73,8 +73,8 @@ describe("runGenerate", () => {
 		expect(await readFile(path.join(tmpDir, "evals.json"), "utf-8")).toBe('{ "existing": true }\n');
 	});
 
-	it("includes configured integration mock resources in the generation prompt", async () => {
-		const configPath = path.join(tmpDir, "skillet.eval.yaml");
+	it("includes configured mock resources in the generation prompt", async () => {
+		const configPath = path.join(tmpDir, "skillet.config.yaml");
 		const openapiPath = path.join(tmpDir, "fixtures/openapi.json");
 		const mcpToolsDir = path.join(tmpDir, "fixtures/mcp/tools");
 		await mkdir(path.dirname(openapiPath), { recursive: true });
@@ -108,7 +108,7 @@ describe("runGenerate", () => {
 				"  - name: openai",
 				"    model: gpt-5.4",
 				"    apiKey: ${OPENAI_API_KEY}",
-				"integrations:",
+				"mocks:",
 				"  render:",
 				"    openapi: ./fixtures/openapi.json",
 				"    mcpServer: ./fixtures/mcp",
@@ -126,7 +126,7 @@ describe("runGenerate", () => {
 						id: 1,
 						prompt: "Debug the unhealthy service.",
 						expected_output: "The service is identified.",
-						integrations: {
+						mocks: {
 							render: {
 								state: { services: [{ id: "svc_123", status: "unhealthy" }] },
 								overrides: {
@@ -147,12 +147,10 @@ describe("runGenerate", () => {
 		await runGenerate({ skills: [tmpDir], count: "1", config: configPath });
 
 		const prompt = chatMock.mock.calls[0]?.[0].messages[0]?.content;
-		expect(prompt).toContain("Available Integration Mock Resources");
+		expect(prompt).toContain("Available Mock Resources");
 		expect(prompt).toContain("### render");
 		expect(prompt).toContain("GET /services/{id}");
 		expect(prompt).toContain("tool:list_services");
-		expect(await readFile(path.join(tmpDir, "evals.generated.json"), "utf-8")).toContain(
-			'"integrations"',
-		);
+		expect(await readFile(path.join(tmpDir, "evals.generated.json"), "utf-8")).toContain('"mocks"');
 	});
 });

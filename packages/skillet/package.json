@@ -1,7 +1,7 @@
 {
 	"name": "@render-lab/skillet",
-	"version": "0.1.14",
-	"description": "Toolkit for AI agent skills — package management, context emission, and evaluation",
+	"version": "0.2.0",
+	"description": "Multi-provider skill evals with integration mocks",
 	"type": "module",
 	"author": "Render",
 	"license": "MIT",
@@ -32,19 +32,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest"
 	},
-	"keywords": [
-		"agent",
-		"skills",
-		"eval",
-		"benchmark",
-		"package-manager",
-		"lockfile",
-		"cursor",
-		"claude-code",
-		"codex",
-		"windsurf",
-		"cline"
-	],
+	"keywords": ["agent", "skills", "eval", "benchmark", "mock", "openapi", "mcp"],
 	"engines": {
 		"node": ">=20"
 	},
@@ -56,7 +44,6 @@
 		"jsonrepair": "^3.13.2",
 		"openai": "^6.27.0",
 		"picocolors": "^1.1.1",
-		"semver": "^7.7.1",
 		"yaml": "^2.4.5",
 		"zod": "^3.25.55"
 	},
@@ -64,7 +51,6 @@
 		"@biomejs/biome": "^1.9.4",
 		"@tailwindcss/vite": "^4.2.4",
 		"@types/node": "^22.13.10",
-		"@types/semver": "^7.7.0",
 		"chart.js": "^4.5.1",
 		"tailwindcss": "^4.2.4",
 		"tsup": "^8.5.0",

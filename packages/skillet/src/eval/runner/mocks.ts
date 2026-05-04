@@ -3,15 +3,15 @@ import http from "node:http";
 import path from "node:path";
 import YAML from "yaml";
 import { z } from "zod";
-import type { MockIntegrationConfig, MockToolConfig } from "../config/schema.js";
+import type { MockConfig, MockToolConfig } from "../config/schema.js";
 import type { ToolDefinition, ToolHandler } from "../providers/types.js";
-import type { EvalIntegrationScenario } from "../schemas/evals.js";
+import type { EvalMockScenario } from "../schemas/evals.js";
 import { extractErrorMessage } from "../utils/error.js";
 
 type JsonObject = Record<string, unknown>;
 
 interface RouteDefinition {
-	integration: string;
+	mock: string;
 	method: string;
 	path: string;
 	params: string[];
@@ -20,7 +20,7 @@ interface RouteDefinition {
 }
 
 interface ToolMockDefinition {
-	integration: string;
+	mock: string;
 	name: string;
 	description: string;
 	parameters?: JsonObject;
@@ -28,16 +28,16 @@ interface ToolMockDefinition {
 	responseFromState?: string;
 }
 
-interface RuntimeIntegration {
+interface RuntimeMock {
 	name: string;
-	config: MockIntegrationConfig;
-	scenario: EvalIntegrationScenario;
+	config: MockConfig;
+	scenario: EvalMockScenario;
 	state: JsonObject;
 	routes: RouteDefinition[];
 	tools: ToolMockDefinition[];
 }
 
-export interface IntegrationMockEnvironment {
+export interface MockEnvironment {
 	tools: ToolDefinition[];
 	handlers: Record<string, ToolHandler>;
 	instructions: string[];
@@ -45,14 +45,14 @@ export interface IntegrationMockEnvironment {
 	cleanup(): Promise<void>;
 }
 
-export interface IntegrationMockSummary {
+export interface MockSummary {
 	name: string;
 	httpRoutes: Array<{ key: string; params: string[] }>;
 	tools: Array<{ key: string; description: string }>;
 	errors: string[];
 }
 
-export interface IntegrationMockManifest {
+export interface MockManifest {
 	version: 1;
 	name: string;
 	generatedAt: string;
@@ -81,7 +81,7 @@ export interface IntegrationMockManifest {
 }
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
-const DEFAULT_MANIFEST_ROOT = path.join(".skillet-evals", "integrations");
+const DEFAULT_MANIFEST_ROOT = path.join(".skillet-evals", "mocks");
 
 function asArray(value: string | string[] | undefined): string[] {
 	if (!value) return [];
@@ -182,7 +182,7 @@ function firstJsonResponse(operation: JsonObject): unknown {
 }
 
 async function importOpenApiRoutes(
-	integration: string,
+	mockName: string,
 	sources: string[],
 ): Promise<RouteDefinition[]> {
 	const routes: RouteDefinition[] = [];
@@ -202,7 +202,7 @@ async function importOpenApiRoutes(
 			for (const [method, operation] of Object.entries(pathItem as JsonObject)) {
 				if (!HTTP_METHODS.has(method) || !operation || typeof operation !== "object") continue;
 				routes.push({
-					integration,
+					mock: mockName,
 					method: method.toUpperCase(),
 					path: routePath,
 					params: routeParams(routePath),
@@ -227,17 +227,13 @@ function readJsonFiles(dir: string): string[] {
 	return files;
 }
 
-function toolFromDescriptor(
-	integration: string,
-	descriptor: JsonObject,
-): ToolMockDefinition | null {
+function toolFromDescriptor(mockName: string, descriptor: JsonObject): ToolMockDefinition | null {
 	const name = descriptor.name;
 	if (typeof name !== "string") return null;
 	return {
-		integration,
+		mock: mockName,
 		name,
-		description:
-			typeof descriptor.description === "string" ? descriptor.description : "Mock integration tool",
+		description: typeof descriptor.description === "string" ? descriptor.description : "Mock tool",
 		parameters:
 			descriptor.arguments && typeof descriptor.arguments === "object"
 				? (descriptor.arguments as JsonObject)
@@ -251,7 +247,7 @@ function jsonSchemaType(type: string): string {
 	return "string";
 }
 
-function importMcpToolsFromReadme(integration: string, content: string): ToolMockDefinition[] {
+function importMcpToolsFromReadme(mockName: string, content: string): ToolMockDefinition[] {
 	const tools: ToolMockDefinition[] = [];
 	const lines = content.split(/\r?\n/);
 	let current:
@@ -266,7 +262,7 @@ function importMcpToolsFromReadme(integration: string, content: string): ToolMoc
 	const flush = () => {
 		if (!current) return;
 		tools.push({
-			integration,
+			mock: mockName,
 			name: current.name,
 			description: current.description,
 			parameters: {
@@ -284,7 +280,7 @@ function importMcpToolsFromReadme(integration: string, content: string): ToolMoc
 			flush();
 			current = {
 				name: toolMatch[1] ?? "",
-				description: toolMatch[2] ?? "Mock integration tool",
+				description: toolMatch[2] ?? "Mock tool",
 				properties: {},
 				required: [],
 			};
@@ -309,25 +305,22 @@ function importMcpToolsFromReadme(integration: string, content: string): ToolMoc
 	return tools;
 }
 
-export function integrationMockManifestRoot(projectRoot = process.cwd()): string {
+export function mockManifestRoot(projectRoot = process.cwd()): string {
 	return path.resolve(projectRoot, DEFAULT_MANIFEST_ROOT);
 }
 
-function integrationMockManifestPath(rootDir: string, name: string): string {
+function mockManifestPath(rootDir: string, name: string): string {
 	return path.join(rootDir, name, "manifest.json");
 }
 
-function loadIntegrationMockManifest(
-	rootDir: string,
-	name: string,
-): IntegrationMockManifest | undefined {
-	const manifestPath = integrationMockManifestPath(rootDir, name);
+function loadMockManifest(rootDir: string, name: string): MockManifest | undefined {
+	const manifestPath = mockManifestPath(rootDir, name);
 	if (!fs.existsSync(manifestPath)) return undefined;
-	return JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as IntegrationMockManifest;
+	return JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as MockManifest;
 }
 
 async function importMcpToolDescriptors(
-	integration: string,
+	mockName: string,
 	sources: string[],
 ): Promise<ToolMockDefinition[]> {
 	const tools: ToolMockDefinition[] = [];
@@ -339,19 +332,19 @@ async function importMcpToolDescriptors(
 					`${source} is a URL. Use a GitHub repo URL, a README URL, or a local path containing MCP tool descriptor JSON files.`,
 				);
 			}
-			tools.push(...importMcpToolsFromReadme(integration, await readTextSource(readmeUrl)));
+			tools.push(...importMcpToolsFromReadme(mockName, await readTextSource(readmeUrl)));
 			continue;
 		}
 		const stat = fs.statSync(source);
 		const readmePath = stat.isDirectory() ? path.join(source, "README.md") : undefined;
 		if (readmePath && fs.existsSync(readmePath)) {
-			tools.push(...importMcpToolsFromReadme(integration, fs.readFileSync(readmePath, "utf-8")));
+			tools.push(...importMcpToolsFromReadme(mockName, fs.readFileSync(readmePath, "utf-8")));
 		}
 		const files = stat.isDirectory() ? readJsonFiles(source) : [source];
 		for (const file of files) {
 			try {
 				const descriptor = JSON.parse(fs.readFileSync(file, "utf-8"));
-				const tool = toolFromDescriptor(integration, descriptor);
+				const tool = toolFromDescriptor(mockName, descriptor);
 				if (tool) tools.push(tool);
 			} catch {
 				// Ignore unrelated JSON files in MCP repos.
@@ -439,7 +432,7 @@ function toolStateFallback(tool: ToolMockDefinition, state: JsonObject, args: Js
 }
 
 function resolveOverride(
-	scenario: EvalIntegrationScenario,
+	scenario: EvalMockScenario,
 	key: string,
 	state: JsonObject,
 	params: JsonObject,
@@ -458,25 +451,25 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown) {
 	res.end(JSON.stringify(body));
 }
 
-async function startHttpServer(integrations: RuntimeIntegration[]): Promise<{
+async function startHttpServer(mocks: RuntimeMock[]): Promise<{
 	url: string;
 	close: () => Promise<void>;
 }> {
 	const server = http.createServer((req, res) => {
 		const url = new URL(req.url ?? "/", "http://127.0.0.1");
-		for (const integration of integrations) {
-			for (const route of integration.routes) {
+		for (const mock of mocks) {
+			for (const route of mock.routes) {
 				if (route.method !== req.method) continue;
 				const params = matchPath(route.path, url.pathname);
 				if (!params) continue;
 				const key = `${route.method} ${route.path}`;
 				const body =
-					resolveOverride(integration.scenario, key, integration.state, params) ??
+					resolveOverride(mock.scenario, key, mock.state, params) ??
 					(route.responseFromState
-						? getByStateExpression(integration.state, route.responseFromState, params)
+						? getByStateExpression(mock.state, route.responseFromState, params)
 						: undefined) ??
 					route.response ??
-					routeStateFallback(route, integration.state, params);
+					routeStateFallback(route, mock.state, params);
 				if (body === undefined) {
 					jsonResponse(res, 404, { error: `No mock response configured for ${key}` });
 					return;
@@ -508,15 +501,15 @@ async function startHttpServer(integrations: RuntimeIntegration[]): Promise<{
 	};
 }
 
-async function buildRuntimeIntegration(
+async function buildRuntimeMock(
 	name: string,
-	config: MockIntegrationConfig,
-	scenario: EvalIntegrationScenario,
-	manifest?: IntegrationMockManifest,
-): Promise<RuntimeIntegration> {
+	config: MockConfig,
+	scenario: EvalMockScenario,
+	manifest?: MockManifest,
+): Promise<RuntimeMock> {
 	const routes = manifest
 		? manifest.httpRoutes.map((route) => ({
-				integration: name,
+				mock: name,
 				method: route.method,
 				path: route.path,
 				params: route.params,
@@ -528,7 +521,7 @@ async function buildRuntimeIntegration(
 			: [];
 	const tools = manifest
 		? manifest.tools.map((tool) => ({
-				integration: name,
+				mock: name,
 				name: tool.name,
 				description: tool.description,
 				parameters: tool.parameters,
@@ -540,7 +533,7 @@ async function buildRuntimeIntegration(
 					? await importMcpToolDescriptors(name, asArray(config.mcpServer))
 					: []),
 				...config.tools.map((tool: MockToolConfig) => ({
-					integration: name,
+					mock: name,
 					name: tool.name,
 					description: tool.description,
 					parameters: tool.parameters as JsonObject | undefined,
@@ -558,10 +551,7 @@ async function buildRuntimeIntegration(
 	};
 }
 
-export async function buildIntegrationMockManifest(
-	name: string,
-	config: MockIntegrationConfig,
-): Promise<IntegrationMockManifest> {
+export async function buildMockManifest(name: string, config: MockConfig): Promise<MockManifest> {
 	const errors: string[] = [];
 	let routes: RouteDefinition[] = [];
 	let tools: ToolMockDefinition[] = [];
@@ -584,7 +574,7 @@ export async function buildIntegrationMockManifest(
 
 	tools.push(
 		...config.tools.map((tool: MockToolConfig) => ({
-			integration: name,
+			mock: name,
 			name: tool.name,
 			description: tool.description,
 			parameters: tool.parameters as JsonObject | undefined,
@@ -622,14 +612,14 @@ export async function buildIntegrationMockManifest(
 	};
 }
 
-export async function writeIntegrationMockManifests(
-	configs: Record<string, MockIntegrationConfig>,
-	rootDir = integrationMockManifestRoot(),
-): Promise<IntegrationMockManifest[]> {
-	const manifests: IntegrationMockManifest[] = [];
+export async function writeMockManifests(
+	configs: Record<string, MockConfig>,
+	rootDir = mockManifestRoot(),
+): Promise<MockManifest[]> {
+	const manifests: MockManifest[] = [];
 	for (const [name, config] of Object.entries(configs)) {
-		const manifest = await buildIntegrationMockManifest(name, config);
-		const manifestPath = integrationMockManifestPath(rootDir, name);
+		const manifest = await buildMockManifest(name, config);
+		const manifestPath = mockManifestPath(rootDir, name);
 		fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
 		fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 		manifests.push(manifest);
@@ -637,14 +627,14 @@ export async function writeIntegrationMockManifests(
 	return manifests;
 }
 
-export async function summarizeIntegrationMockSources(
-	configs: Record<string, MockIntegrationConfig>,
-	rootDir = integrationMockManifestRoot(),
-): Promise<IntegrationMockSummary[]> {
-	const summaries: IntegrationMockSummary[] = [];
+export async function summarizeMockSources(
+	configs: Record<string, MockConfig>,
+	rootDir = mockManifestRoot(),
+): Promise<MockSummary[]> {
+	const summaries: MockSummary[] = [];
 	for (const [name, config] of Object.entries(configs)) {
-		const manifest = loadIntegrationMockManifest(rootDir, name);
-		const summarySource = manifest ?? (await buildIntegrationMockManifest(name, config));
+		const manifest = loadMockManifest(rootDir, name);
+		const summarySource = manifest ?? (await buildMockManifest(name, config));
 		summaries.push({
 			name,
 			httpRoutes: summarySource.httpRoutes.map((route) => ({
@@ -661,11 +651,11 @@ export async function summarizeIntegrationMockSources(
 	return summaries;
 }
 
-export async function createIntegrationMockEnvironment(
-	configs: Record<string, MockIntegrationConfig>,
-	scenarios: Record<string, EvalIntegrationScenario>,
+export async function createMockEnvironment(
+	configs: Record<string, MockConfig>,
+	scenarios: Record<string, EvalMockScenario>,
 	opts: { manifestRoot?: string } = {},
-): Promise<IntegrationMockEnvironment> {
+): Promise<MockEnvironment> {
 	const requested = Object.entries(scenarios).filter(([name]) => configs[name]);
 	if (requested.length === 0) {
 		return {
@@ -677,41 +667,41 @@ export async function createIntegrationMockEnvironment(
 		};
 	}
 
-	const integrations = await Promise.all(
+	const mocks = await Promise.all(
 		requested.map(([name, scenario]) => {
 			const config = configs[name];
-			if (!config) throw new Error(`Integration "${name}" is not configured`);
-			return buildRuntimeIntegration(
+			if (!config) throw new Error(`Mock "${name}" is not configured`);
+			return buildRuntimeMock(
 				name,
 				config,
 				scenario,
-				loadIntegrationMockManifest(opts.manifestRoot ?? integrationMockManifestRoot(), name),
+				loadMockManifest(opts.manifestRoot ?? mockManifestRoot(), name),
 			);
 		}),
 	);
 
-	const httpIntegrations = integrations.filter((integration) => integration.routes.length > 0);
-	const server = httpIntegrations.length > 0 ? await startHttpServer(httpIntegrations) : undefined;
+	const httpMocks = mocks.filter((mock) => mock.routes.length > 0);
+	const server = httpMocks.length > 0 ? await startHttpServer(httpMocks) : undefined;
 
 	const tools: ToolDefinition[] = [];
 	const handlers: Record<string, ToolHandler> = {};
-	for (const integration of integrations) {
-		for (const tool of integration.tools) {
+	for (const mock of mocks) {
+		for (const tool of mock.tools) {
 			tools.push({
 				name: tool.name,
-				description: `[${integration.name}] ${tool.description}`,
+				description: `[${mock.name}] ${tool.description}`,
 				parameters: zodFromJsonSchema(tool.parameters),
 			});
 			handlers[tool.name] = async (args) => {
 				try {
 					const key = `tool:${tool.name}`;
 					const body =
-						resolveOverride(integration.scenario, key, integration.state, args) ??
+						resolveOverride(mock.scenario, key, mock.state, args) ??
 						(tool.responseFromState
-							? getByStateExpression(integration.state, tool.responseFromState, args)
+							? getByStateExpression(mock.state, tool.responseFromState, args)
 							: undefined) ??
 						tool.response ??
-						toolStateFallback(tool, integration.state, args);
+						toolStateFallback(tool, mock.state, args);
 					if (body === undefined) {
 						return { error: `No mock response configured for ${key}` };
 					}
@@ -725,12 +715,10 @@ export async function createIntegrationMockEnvironment(
 
 	const instructions: string[] = [];
 	if (server) {
-		instructions.push(`Integration mock HTTP base URL: ${server.url}`);
+		instructions.push(`Mock HTTP base URL: ${server.url}`);
 	}
 	if (tools.length > 0) {
-		instructions.push(
-			`Integration mock tools available: ${tools.map((tool) => tool.name).join(", ")}`,
-		);
+		instructions.push(`Mock tools available: ${tools.map((tool) => tool.name).join(", ")}`);
 	}
 
 	return {
@@ -738,14 +726,14 @@ export async function createIntegrationMockEnvironment(
 		handlers,
 		instructions,
 		outputFiles: () =>
-			integrations.map((integration) => ({
-				path: `.skillet/integrations/${integration.name}.json`,
+			mocks.map((mock) => ({
+				path: `.skillet/mocks/${mock.name}.json`,
 				content: JSON.stringify(
 					{
-						name: integration.name,
-						state: integration.state,
-						routes: integration.routes.map((route) => `${route.method} ${route.path}`),
-						tools: integration.tools.map((tool) => tool.name),
+						name: mock.name,
+						state: mock.state,
+						routes: mock.routes.map((route) => `${route.method} ${route.path}`),
+						tools: mock.tools.map((tool) => tool.name),
 					},
 					null,
 					2,
