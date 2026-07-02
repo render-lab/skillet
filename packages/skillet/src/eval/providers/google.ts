@@ -92,15 +92,17 @@ export class GoogleProvider extends BaseProvider {
 			}
 		}
 
+		const config = {
+			systemInstruction: params.system,
+			tools: params.tools?.length ? formatTools(params.tools) : undefined,
+			maxOutputTokens: maxTokens,
+			...(temperature !== undefined ? { temperature } : {}),
+		};
+
 		const response = await this.ai.models.generateContent({
 			model: this.modelId,
 			contents,
-			config: {
-				systemInstruction: params.system,
-				tools: params.tools?.length ? formatTools(params.tools) : undefined,
-				temperature,
-				maxOutputTokens: maxTokens,
-			},
+			config,
 		});
 
 		const rawParts = response.candidates?.[0]?.content?.parts as

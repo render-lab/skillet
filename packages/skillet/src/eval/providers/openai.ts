@@ -62,13 +62,15 @@ export class OpenAIProvider extends BaseProvider {
 			}
 		}
 
-		const response = await this.client.chat.completions.create({
+		const request: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
 			model: this.modelId,
 			messages,
 			tools: params.tools?.length ? formatTools(params.tools) : undefined,
-			temperature,
 			max_completion_tokens: maxTokens,
-		});
+		};
+		if (temperature !== undefined) request.temperature = temperature;
+
+		const response = await this.client.chat.completions.create(request);
 
 		const choice = response.choices[0];
 		const toolCalls: ToolCall[] = (choice.message.tool_calls ?? [])

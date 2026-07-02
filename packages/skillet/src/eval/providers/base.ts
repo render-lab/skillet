@@ -1,16 +1,15 @@
 import type { ChatParams, ChatResponse, LLMProvider, ToolCall } from "./types.js";
 
 const DEFAULT_MAX_TOKENS = 8192;
-const DEFAULT_TEMPERATURE = 0;
 
 /** Normalize optional ChatParams fields to concrete defaults. */
 export function normalizeChatParams(params: ChatParams): {
 	maxTokens: number;
-	temperature: number;
+	temperature?: number;
 } {
 	return {
 		maxTokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
-		temperature: params.temperature ?? DEFAULT_TEMPERATURE,
+		temperature: params.temperature,
 	};
 }
 

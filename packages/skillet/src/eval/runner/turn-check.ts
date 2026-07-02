@@ -45,7 +45,6 @@ export function createTurnChecker(graderProvider: LLMProvider) {
 							content: `## Assistant's last message\n\n${trimmedResponse}\n\n## Scripted user reply\n\n${nextUserMessage}\n\nIs this reply relevant?`,
 						},
 					],
-					temperature: 0,
 					maxTokens: TURN_CHECK_MAX_TOKENS,
 				}),
 				TURN_CHECK_TIMEOUT_MS,

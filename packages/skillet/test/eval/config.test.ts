@@ -53,8 +53,8 @@ describe("loadConfig", () => {
 			maxSteps: 20,
 			runsPerProvider: 3,
 			timeout: 42,
-			temperature: 0,
 		});
+		expect(config.settings.temperature).toBeUndefined();
 		expect(config.skillRoots).toEqual([]);
 	});
 

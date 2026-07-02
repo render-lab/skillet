@@ -59,14 +59,16 @@ export class AnthropicProvider extends BaseProvider {
 			return { role: m.role as "user" | "assistant", content: m.content };
 		});
 
-		const stream = this.client.messages.stream({
+		const request: Anthropic.Messages.MessageStreamParams = {
 			model: this.modelId,
 			max_tokens: maxTokens,
 			system: params.system,
 			messages,
 			tools: params.tools?.length ? formatTools(params.tools) : undefined,
-			temperature,
-		});
+		};
+		if (temperature !== undefined) request.temperature = temperature;
+
+		const stream = this.client.messages.stream(request);
 
 		const response = await stream.finalMessage();
 

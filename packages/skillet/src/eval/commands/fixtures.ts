@@ -174,7 +174,6 @@ async function runFixturesForSkill(opts: {
 		const response = await opts.provider.chat({
 			system: FIXTURE_SYSTEM_PROMPT,
 			messages: chatMessages,
-			temperature: 0.3,
 			maxTokens: 32_768,
 		});
 

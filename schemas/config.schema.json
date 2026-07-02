@@ -42,8 +42,7 @@
         "temperature": {
           "type": "number",
           "minimum": 0,
-          "maximum": 2,
-          "default": 0
+          "maximum": 2
         }
       },
       "additionalProperties": false,

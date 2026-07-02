@@ -90,7 +90,6 @@ settings:
   maxSteps: 20
   timeout: 300
   runsPerProvider: 1
-  temperature: 0
 ```
 
 API keys are also read from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). When no `skillet.config.yaml` is present, Skillet falls back to env-var-only auto-detection.

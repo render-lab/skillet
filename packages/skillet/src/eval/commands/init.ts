@@ -603,7 +603,6 @@ export async function runInit() {
 			maxSteps: 20,
 			timeout: 300,
 			runsPerProvider: 1,
-			temperature: 0,
 		},
 	};
 

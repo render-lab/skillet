@@ -346,7 +346,6 @@ async function runGenerateForSkill(opts: {
 		const response = await opts.provider.chat({
 			system: GENERATE_SYSTEM_PROMPT,
 			messages: chatMessages,
-			temperature: 0.3,
 			maxTokens: 32_768,
 		});
 

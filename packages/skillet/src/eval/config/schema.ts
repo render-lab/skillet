@@ -44,7 +44,7 @@ export const ConfigFileSchema = z.object({
 			maxSteps: z.number().int().positive().default(20),
 			timeout: z.number().positive().default(300),
 			runsPerProvider: z.number().int().positive().default(1),
-			temperature: z.number().min(0).max(2).default(0),
+			temperature: z.number().min(0).max(2).optional(),
 		})
 		.default({}),
 });

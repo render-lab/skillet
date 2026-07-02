@@ -17,7 +17,6 @@ export async function gradeRun(
 		const response = await graderProvider.chat({
 			system: GRADER_SYSTEM_PROMPT,
 			messages: [{ role: "user", content: prompt }],
-			temperature: 0,
 		});
 
 		try {
