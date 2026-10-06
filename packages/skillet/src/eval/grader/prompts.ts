@@ -6,6 +6,9 @@ import { getTurns } from "../schemas/evals.js";
 const MAX_GRADING_CHARS = 300_000;
 const CAP_USER_MESSAGE = 1_000;
 const CAP_ASSISTANT_RESPONSE = 3_000;
+// The last response in each user turn is the answer the user sees, and assertions
+// usually grade it, so it gets a much larger cap than intermediate steps.
+const CAP_FINAL_RESPONSE = 30_000;
 const CAP_OUTPUT_FILE = 5_000;
 const CAP_TOOL_VALUE = 2_000;
 const CAP_SKIPPED_TURN = 200;
@@ -23,6 +26,7 @@ function truncVal(val: unknown, max = CAP_TOOL_VALUE): string {
 function formatTranscriptStep(
 	step: TranscriptStep,
 	lastTurn: number,
+	isFinalResponse: boolean,
 ): { text: string; newLastTurn: number } {
 	const parts: string[] = [];
 	let currentLastTurn = lastTurn;
@@ -39,7 +43,10 @@ function formatTranscriptStep(
 	}
 
 	parts.push(`--- Step ${step.step} ---`);
-	if (step.response) parts.push(`Assistant: ${cap(step.response, CAP_ASSISTANT_RESPONSE)}`);
+	if (step.response) {
+		const limit = isFinalResponse ? CAP_FINAL_RESPONSE : CAP_ASSISTANT_RESPONSE;
+		parts.push(`Assistant: ${cap(step.response, limit)}`);
+	}
 	for (const tc of step.toolCalls ?? []) {
 		parts.push(`Tool call: ${tc.name}(${truncVal(tc.arguments)})`);
 	}
@@ -55,11 +62,20 @@ function formatTranscriptStep(
 	return { text: parts.join("\n"), newLastTurn: currentLastTurn };
 }
 
+function finalResponseIndices(transcript: TranscriptStep[]): Set<number> {
+	const lastByTurn = new Map<number, number>();
+	transcript.forEach((step, i) => {
+		if (step.response) lastByTurn.set(step.turn ?? 0, i);
+	});
+	return new Set(lastByTurn.values());
+}
+
 function formatTranscript(agentRun: AgentRun): string {
+	const finals = finalResponseIndices(agentRun.transcript);
 	let lastTurn = -1;
 	return agentRun.transcript
-		.map((step) => {
-			const { text, newLastTurn } = formatTranscriptStep(step, lastTurn);
+		.map((step, i) => {
+			const { text, newLastTurn } = formatTranscriptStep(step, lastTurn, finals.has(i));
 			lastTurn = newLastTurn;
 			return text;
 		})

@@ -1,6 +1,6 @@
 {
 	"name": "@render-lab/skillet",
-	"version": "0.2.2",
+	"version": "0.2.3",
 	"description": "Multi-provider skill evals with integration mocks",
 	"type": "module",
 	"author": "Render",
