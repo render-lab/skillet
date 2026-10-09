@@ -19,6 +19,12 @@ const SKIP_DIRS = new Set([
 	".cache",
 ]);
 
+/** Sandbox subdirectory that holds a copy of the skill under test. */
+export const SKILL_DIR_NAME = ".skill";
+
+/** Skill subdirectories copied alongside SKILL.md, per the Agent Skills layout. */
+const SKILL_SUBDIRS = ["references", "scripts", "assets"];
+
 const MAX_COLLECTED_FILE = 50 * 1024;
 const MAX_TOTAL_COLLECTED = 200 * 1024;
 
@@ -31,6 +37,20 @@ export function seedSandbox(sandboxDir: string, skillDir: string, files: string[
 			fs.mkdirSync(path.dirname(dest), { recursive: true });
 			fs.copyFileSync(src, dest);
 		}
+	}
+}
+
+/**
+ * Copy the skill's SKILL.md and its references/, scripts/, and assets/ into the
+ * sandbox, so instructions such as "read references/x.md" work during evals.
+ */
+export function seedSkill(sandboxDir: string, skillDir: string) {
+	const dest = path.join(sandboxDir, SKILL_DIR_NAME);
+	fs.mkdirSync(dest, { recursive: true });
+	fs.copyFileSync(path.join(skillDir, "SKILL.md"), path.join(dest, "SKILL.md"));
+	for (const sub of SKILL_SUBDIRS) {
+		const src = path.join(skillDir, sub);
+		if (fs.existsSync(src)) fs.cpSync(src, path.join(dest, sub), { recursive: true });
 	}
 }
 
@@ -52,6 +72,8 @@ export function collectOutputFiles(sandboxDir: string): Array<{ path: string; co
 			const full = path.join(dir, entry.name);
 			if (entry.isDirectory()) {
 				if (SKIP_DIRS.has(entry.name)) continue;
+				// The seeded skill copy is input, not agent output.
+				if (dir === sandboxDir && entry.name === SKILL_DIR_NAME) continue;
 				walk(full);
 			} else {
 				try {

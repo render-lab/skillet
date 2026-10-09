@@ -17,7 +17,13 @@ import { rateColor } from "../utils/rate.js";
 import { runAgentLoop } from "./agent-loop.js";
 import { createMockEnvironment } from "./mocks.js";
 import { Spinner } from "./spinner.js";
-import { collectOutputFiles, createToolHandlers, defaultTools, seedSandbox } from "./tools.js";
+import {
+	collectOutputFiles,
+	createToolHandlers,
+	defaultTools,
+	seedSandbox,
+	seedSkill,
+} from "./tools.js";
 import { createTurnChecker } from "./turn-check.js";
 
 export interface RunEntry {
@@ -142,6 +148,8 @@ export async function runOrchestrator(
 	fixturesDir: string,
 	systemPrompt: string,
 	opts: {
+		/** Skill directory to copy into each sandbox, so the agent can read its references. */
+		skillDir?: string;
 		concurrency?: number;
 		onProgress?: (msg: string) => void;
 	} = {},
@@ -184,6 +192,7 @@ export async function runOrchestrator(
 		let mockEnv: Awaited<ReturnType<typeof createMockEnvironment>> | undefined;
 
 		try {
+			if (opts.skillDir) seedSkill(sandboxDir, opts.skillDir);
 			seedSandbox(sandboxDir, fixturesDir, entry.evalCase.files);
 			mockEnv = await createMockEnvironment(config.mocks, entry.evalCase.mocks);
 			const id = taskId(entry);
