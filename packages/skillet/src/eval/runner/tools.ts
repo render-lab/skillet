@@ -5,7 +5,7 @@ import type { ToolHandler } from "../providers/types.js";
 import { extractErrorMessage } from "../utils/error.js";
 
 export { defaultTools } from "./tool-defs.js";
-export { collectOutputFiles, seedSandbox } from "./sandbox.js";
+export { collectOutputFiles, SKILL_DIR_NAME, seedSandbox, seedSkill } from "./sandbox.js";
 
 const MAX_OUTPUT_CHARS = 30_000;
 const MAX_FILE_SIZE = 100 * 1024;

@@ -13,6 +13,7 @@ import { printResults } from "../report/console-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
 import { writeMockManifests } from "../runner/mocks.js";
 import { runOrchestrator } from "../runner/orchestrator.js";
+import { SKILL_DIR_NAME } from "../runner/sandbox.js";
 import { BenchmarkFileSchema } from "../schemas/benchmark.js";
 import { type EvalCase, EvalsFileSchema, getTurns } from "../schemas/evals.js";
 import {
@@ -51,6 +52,8 @@ export function buildSystemPrompt(skillContent: string): string {
 <skill_instructions>
 ${skillContent}
 </skill_instructions>
+
+The skill's files are in the \`${SKILL_DIR_NAME}/\` directory of your working directory. Resolve file paths in the skill instructions, such as \`references/...\`, against \`${SKILL_DIR_NAME}/\`.
 
 Use the available tools (bash, read_file, write_file, list_directory) to complete the task. Work step by step.`;
 }
@@ -252,6 +255,7 @@ async function runSingleSkill(
 	printRunHeader(opts, paths, evals, config, skillMeta);
 
 	const result = await runOrchestrator(config, evals, paths.evalsDir, systemPrompt, {
+		skillDir: paths.skillDir,
 		concurrency: opts.concurrency ? Number(opts.concurrency) : undefined,
 	});
 
