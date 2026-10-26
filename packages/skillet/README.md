@@ -344,3 +344,10 @@ with usage and the provider's stop reason when available. It is not sent to the
 grader: it has zero graded assertions and an error, not a behavioral pass or fail.
 Tool-only runs and textual refusals still receive normal grading. Existing
 benchmark files remain readable.
+
+Provider-call and overall eval timeouts are recorded as `error_kind: timeout`,
+with zero graded assertions and a separate runtime error. They are excluded from
+behavioral pass-rate averages. Elapsed wall time and usage from received agent
+responses are retained; tokens/cost for an unfinished request and grader usage
+are not available in those totals. A timeout stops subsequent agent steps, but
+is not a guarantee that an already-running external request or tool was cancelled.

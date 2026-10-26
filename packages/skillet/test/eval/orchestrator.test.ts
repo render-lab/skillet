@@ -12,6 +12,8 @@ vi.mock("../../src/eval/providers/factory.js", () => ({
 	createProvider: () => ({ name: "test", modelId: "test-model", chat }),
 }));
 vi.mock("../../src/eval/grader/grader.js", () => ({ gradeRun: grade }));
+import * as pricing from "../../src/eval/providers/pricing.js";
+import { printResults } from "../../src/eval/report/console-reporter.js";
 import { runOrchestrator } from "../../src/eval/runner/orchestrator.js";
 
 const config: ResolvedConfig = {
@@ -54,7 +56,11 @@ describe("eval outcome classification", () => {
 		skill = fs.mkdtempSync(path.join(os.tmpdir(), "skillet-outcome-"));
 		fs.writeFileSync(path.join(skill, "SKILL.md"), "skill");
 	});
-	afterEach(() => fs.rmSync(skill, { recursive: true, force: true }));
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+		fs.rmSync(skill, { recursive: true, force: true });
+	});
 
 	it("records an empty response as ungraded with usage and provider stop reason, without calling the grader", async () => {
 		chat.mockResolvedValue(response("  ", { providerStopReason: "refusal" }));
@@ -113,5 +119,130 @@ describe("eval outcome classification", () => {
 		expect(grade).toHaveBeenCalledTimes(1);
 		expect(grade.mock.calls[0]?.[3]).toEqual([{ path: "answer.txt", content: "done" }]);
 		expect(result.runs[0]?.error).toBeNull();
+	});
+});
+
+describe("timeouts preserve evidence without grading incomplete runs", () => {
+	let skill: string;
+	beforeEach(() => {
+		vi.spyOn(pricing, "estimateCost").mockImplementation(
+			(_model, input, output) => (input + 2 * output) / 1_000_000,
+		);
+		vi.useFakeTimers({
+			toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance"],
+		});
+		chat.mockReset();
+		grade.mockReset();
+		grade.mockResolvedValue({
+			pass_rate: 1,
+			passed: 1,
+			failed: 0,
+			total: 1,
+			expectations: [],
+			claims: [],
+			eval_feedback: null,
+		});
+		skill = fs.mkdtempSync(path.join(os.tmpdir(), "skillet-timeout-"));
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+		fs.rmSync(skill, { recursive: true, force: true });
+	});
+
+	it.each([
+		{ timeout: 5, elapsed: 5000, label: "overall eval" },
+		{ timeout: 300, elapsed: 120000, label: "provider call" },
+	])(
+		"classifies a $label timeout, retains prior usage, and prevents late tool execution",
+		async ({ timeout, elapsed }) => {
+			let resolveLate!: (value: ChatResponse) => void;
+			chat
+				.mockResolvedValueOnce(
+					response("Inspecting", {
+						stopReason: "tool_use",
+						usage: { inputTokens: 20, outputTokens: 5 },
+						toolCalls: [{ id: "1", name: "unavailable_tool", arguments: {} }],
+					}),
+				)
+				.mockImplementationOnce(
+					() =>
+						new Promise<ChatResponse>((resolve) => {
+							resolveLate = resolve;
+						}),
+				)
+				.mockResolvedValueOnce(response("Done"));
+			const running = runOrchestrator(
+				{ ...config, settings: { ...config.settings, timeout } },
+				[evalCase, { ...evalCase, id: 2 }],
+				skill,
+				"skill",
+				{ concurrency: 1 },
+			);
+			await vi.advanceTimersByTimeAsync(elapsed);
+			const result = await running;
+			const timedOut = result.runs[0];
+			expect(timedOut).toMatchObject({
+				error_kind: "timeout",
+				expectations: [],
+				result: {
+					passed: 0,
+					failed: 0,
+					total: 0,
+					time_seconds: elapsed / 1000,
+					input_tokens: 20,
+					output_tokens: 5,
+					total_tokens: 25,
+					tool_calls: 1,
+					errors: 2,
+				},
+			});
+			expect(timedOut?.error).toContain("timed out");
+			expect(timedOut?.result.cost_usd).toBeCloseTo(0.00003);
+			expect(result.providerSummary["test-model"]?.pass_rate.mean).toBe(1);
+			expect(grade).toHaveBeenCalledTimes(1);
+			const lateFile = path.join(skill, "late.txt");
+			resolveLate(
+				response("Late tool", {
+					stopReason: "tool_use",
+					toolCalls: [
+						{
+							id: "late",
+							name: "write_file",
+							arguments: { path: lateFile, content: "must not run" },
+						},
+					],
+				}),
+			);
+			await vi.advanceTimersByTimeAsync(0);
+			expect(fs.existsSync(lateFile)).toBe(false);
+			expect(chat).toHaveBeenCalledTimes(3);
+			expect(grade).toHaveBeenCalledTimes(1);
+			expect(vi.getTimerCount()).toBe(0);
+			const log = vi.spyOn(console, "log").mockImplementation(() => {});
+			printResults(result, [evalCase], 1);
+			const output = log.mock.calls.flat().join("\n");
+			expect(output).toContain("ungraded (timeout)");
+			expect(output).toContain("1 timeout(s)");
+			expect(output).not.toContain("0/0 passed");
+		},
+	);
+
+	it("retains completed agent usage when grading exceeds the overall deadline", async () => {
+		chat.mockResolvedValue(response("Done", { usage: { inputTokens: 30, outputTokens: 8 } }));
+		grade.mockImplementation(() => new Promise(() => {}));
+		const running = runOrchestrator(config, [evalCase], skill, "skill", { concurrency: 1 });
+		await vi.advanceTimersByTimeAsync(5000);
+		const result = await running;
+		expect(result.runs[0]).toMatchObject({
+			error_kind: "timeout",
+			expectations: [],
+			result: { total: 0, failed: 0, time_seconds: 5, total_tokens: 38 },
+		});
+		expect(result.runs[0]?.error).toContain("grading");
+		expect(vi.getTimerCount()).toBe(0);
+		const log = vi.spyOn(console, "log").mockImplementation(() => {});
+		printResults(result, [evalCase], 1);
+		expect(log.mock.calls.flat().join("\n")).toContain("Ungraded overall");
 	});
 });

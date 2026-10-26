@@ -41,6 +41,10 @@ export interface AgentLoopParams {
 	maxSteps?: number;
 	temperature?: number;
 	onActivity?: (detail: string) => void;
+	/** Reports usage as responses arrive, including before tool execution. */
+	onProgress?: (run: AgentRun) => void;
+	/** Stops scheduling further work; in-flight external requests may still finish. */
+	signal?: AbortSignal;
 	heartbeatIntervalMs?: number;
 	/** When provided, called before injecting the next scripted turn to verify
 	 *  the reply makes sense given the agent's last response. Return false to
@@ -72,6 +76,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 	const debug = !!process.env.SKILL_EVAL_DEBUG;
 
 	for (let step = 0; step < maxSteps; step++) {
+		params.signal?.throwIfAborted();
 		if (debug) {
 			const { preSize, breakdown } = debugPayloadLog(step, messages, system);
 			console.error(
@@ -99,6 +104,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 				provider.chat({ system, messages, tools, temperature }),
 				API_CALL_TIMEOUT_MS,
 				`provider.chat (step ${step + 1})`,
+				params.signal,
 			),
 			{
 				intervalMs: heartbeatIntervalMs,
@@ -109,6 +115,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 			},
 		);
 
+		params.signal?.throwIfAborted();
 		const transcriptStep: TranscriptStep = {
 			step,
 			turn: currentTurn,
@@ -120,14 +127,15 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 			latencyMs: response.latencyMs,
 		};
 
+		transcript.push(transcriptStep);
+		params.onProgress?.(buildAgentRun(transcript));
+
 		const textSnippet = extractSnippet(response.content);
 		if (textSnippet) {
 			emit(textSnippet);
 		}
 
 		if (response.stopReason !== "tool_use" || !response.toolCalls?.length) {
-			transcript.push(transcriptStep);
-
 			if (nextTurn < turns.length) {
 				const userReply = turns[nextTurn];
 
@@ -136,7 +144,12 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 						`${turnPrefix(currentTurn, turns.length)} — checking turn relevance for turn ${nextTurn + 1}/${turns.length}…`,
 					);
 					const relevant = await withHeartbeat(
-						params.checkTurnRelevance(response.content, userReply),
+						withTimeout(
+							params.checkTurnRelevance(response.content, userReply),
+							API_CALL_TIMEOUT_MS,
+							"turn relevance check",
+							params.signal,
+						),
 						{
 							intervalMs: TURN_RELEVANCE_HEARTBEAT_MS,
 							onHeartbeat: (elapsedMs) =>
@@ -145,6 +158,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 								),
 						},
 					);
+					params.signal?.throwIfAborted();
 					if (!relevant) {
 						emit("turn mismatch — agent didn't ask for expected input, ending conversation");
 						transcriptStep.turnSkipped = userReply;
@@ -173,6 +187,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 		});
 
 		for (const tc of response.toolCalls) {
+			params.signal?.throwIfAborted();
 			const argSnippet = summarizeToolArgs(tc.name, tc.arguments);
 			emit(`${tc.name}(${argSnippet})`);
 
@@ -188,15 +203,15 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 				result = { error: `Unknown tool: ${tc.name}` };
 			}
 
+			params.signal?.throwIfAborted();
 			transcriptStep.toolResults.push({ id: tc.id, name: tc.name, result });
+			params.onProgress?.(buildAgentRun(transcript));
 			messages.push({
 				role: "tool_result",
 				content: JSON.stringify(result),
 				toolCallId: tc.id,
 			});
 		}
-
-		transcript.push(transcriptStep);
 	}
 
 	return buildAgentRun(transcript);

@@ -87,7 +87,7 @@ function renderRunRows(run: ReportRun): string {
 			return `<tr>
 				<td>${escapeHtml(benchmarkRun.eval_id)}</td>
 				<td>${escapeHtml(benchmarkRun.model)}</td>
-				<td class="${scoreClass(rate)}">${benchmarkRun.error_kind === "empty_response" ? "Ungraded: empty response" : pct(rate)}</td>
+				<td class="${scoreClass(rate)}">${benchmarkRun.error_kind ? `Ungraded: ${benchmarkRun.error_kind.replaceAll("_", " ")}` : pct(rate)}</td>
 				<td>${escapeHtml(`${benchmarkRun.result?.passed ?? 0}/${benchmarkRun.result?.total ?? 0}`)}</td>
 				<td>${escapeHtml((benchmarkRun.result?.time_seconds ?? 0).toFixed(1))}s</td>
 				<td>${escapeHtml(benchmarkRun.error ?? "")}</td>
@@ -141,7 +141,7 @@ function renderReport(runs: ReportRun[]): string {
 	</header>
 
 	<section class="grid">
-		<div class="card"><div class="value ${scoreClass(overallRate)}">${pct(overallRate)}</div><div class="label">Overall pass rate</div></div>
+		<div class="card"><div class="value ${scoreClass(overallRate)}">${totalAssertions ? pct(overallRate) : "Ungraded"}</div><div class="label">Overall pass rate</div></div>
 		<div class="card"><div class="value">${escapeHtml(`${totalPassed}/${totalAssertions}`)}</div><div class="label">Assertions passed</div></div>
 		<div class="card"><div class="value">${latestRuns.length}</div><div class="label">Skills with results</div></div>
 		<div class="card"><div class="value">${allBenchmarkRuns.length}</div><div class="label">Runs in latest results</div></div>

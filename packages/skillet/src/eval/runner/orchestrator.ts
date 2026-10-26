@@ -10,7 +10,7 @@ import type { LLMProvider } from "../providers/types.js";
 import type { BenchmarkRun } from "../schemas/benchmark.js";
 import type { EvalCase } from "../schemas/evals.js";
 import type { GradingResult } from "../schemas/grading.js";
-import { withHeartbeat, withTimeout } from "../utils/async.js";
+import { TimeoutError, withHeartbeat, withTimeout } from "../utils/async.js";
 import { extractErrorMessage } from "../utils/error.js";
 import { mean, sleep, stddev } from "../utils/math.js";
 import { rateColor } from "../utils/rate.js";
@@ -18,6 +18,7 @@ import { runAgentLoop } from "./agent-loop.js";
 import { createMockEnvironment } from "./mocks.js";
 import { Spinner } from "./spinner.js";
 import { collectOutputFiles, createToolHandlers, defaultTools, seedSandbox } from "./tools.js";
+import { type AgentRun, buildAgentRun } from "./transcript.js";
 import { createTurnChecker } from "./turn-check.js";
 
 export interface RunEntry {
@@ -111,12 +112,8 @@ function computeProviderSummary(runs: BenchmarkRun[]): OrchestratorResult["provi
 		});
 		summary[key] = {
 			pass_rate: {
-				mean: mean(
-					modelRuns.filter((r) => r.error_kind !== "empty_response").map((r) => r.result.pass_rate),
-				),
-				stddev: stddev(
-					modelRuns.filter((r) => r.error_kind !== "empty_response").map((r) => r.result.pass_rate),
-				),
+				mean: mean(modelRuns.filter((r) => !r.error_kind).map((r) => r.result.pass_rate)),
+				stddev: stddev(modelRuns.filter((r) => !r.error_kind).map((r) => r.result.pass_rate)),
 			},
 			time_seconds: stat((r) => r.result.time_seconds),
 			total_tokens: stat((r) => r.result.total_tokens),
@@ -133,8 +130,8 @@ function formatSuccessLine(
 	total: number,
 ): string {
 	const r = result.result;
-	if (result.error_kind === "empty_response") {
-		return `  ${pc.red("!")} [${completed}/${total}] eval ${entry.evalCase.id} · ${entry.provider.modelId} · empty response (ungraded)`;
+	if (result.error_kind) {
+		return `  ${pc.red("!")} [${completed}/${total}] eval ${entry.evalCase.id} · ${entry.provider.modelId} · ${result.error_kind.replaceAll("_", " ")} (ungraded)`;
 	}
 	const passColor = rateColor(r.pass_rate);
 	return (
@@ -190,6 +187,9 @@ export async function runOrchestrator(
 
 	async function executeOne(entry: RunEntry): Promise<BenchmarkRun> {
 		const evalTimeoutMs = config.settings.timeout * 1000;
+		const startedAt = performance.now();
+		const controller = new AbortController();
+		let progress: AgentRun = buildAgentRun([]);
 		const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), "skillet-eval-"));
 		let lastDetail = "starting…";
 		let mockEnv: Awaited<ReturnType<typeof createMockEnvironment>> | undefined;
@@ -222,9 +222,15 @@ export async function runOrchestrator(
 						maxSteps: config.settings.maxSteps,
 						temperature: config.settings.temperature,
 						onActivity: updateDetail,
+						signal: controller.signal,
+						onProgress: (run) => {
+							progress = run;
+						},
 						checkTurnRelevance: turns.length > 1 ? createTurnChecker(graderProvider) : undefined,
 					});
 
+					controller.signal.throwIfAborted();
+					progress = agentRun;
 					const outputFiles = [
 						...collectOutputFiles(sandboxDir, seeded),
 						...(mockEnv?.outputFiles() ?? []),
@@ -262,7 +268,12 @@ export async function runOrchestrator(
 					}
 					updateDetail("grading…");
 					const grading: GradingResult = await withHeartbeat(
-						gradeRun(graderProvider, entry.evalCase, agentRun, outputFiles),
+						withTimeout(
+							gradeRun(graderProvider, entry.evalCase, agentRun, outputFiles),
+							evalTimeoutMs,
+							"grading",
+							controller.signal,
+						),
 						{
 							intervalMs: PHASE_HEARTBEAT_MS,
 							onHeartbeat: (elapsedMs) =>
@@ -303,6 +314,31 @@ export async function runOrchestrator(
 				evalTimeoutMs,
 				() => `${taskLabel(entry)} — ${lastDetail}`,
 			);
+		} catch (error) {
+			controller.abort(error);
+			if (!(error instanceof TimeoutError)) throw error;
+			return {
+				...buildFailureResult(entry, `${extractErrorMessage(error)}; assertions were not graded.`),
+				error_kind: "timeout",
+				expectations: [],
+				result: {
+					pass_rate: 0,
+					passed: 0,
+					failed: 0,
+					total: 0,
+					time_seconds: (performance.now() - startedAt) / 1000,
+					input_tokens: progress.totalInputTokens,
+					output_tokens: progress.totalOutputTokens,
+					total_tokens: progress.totalInputTokens + progress.totalOutputTokens,
+					tool_calls: progress.totalToolCalls,
+					errors: progress.errors + 1,
+					cost_usd: estimateCost(
+						entry.provider.modelId,
+						progress.totalInputTokens,
+						progress.totalOutputTokens,
+					),
+				},
+			};
 		} finally {
 			await mockEnv?.cleanup();
 			fs.rmSync(sandboxDir, { recursive: true, force: true });

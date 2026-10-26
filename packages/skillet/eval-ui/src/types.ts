@@ -45,7 +45,7 @@ export interface BenchmarkRun {
 	claims?: string[];
 	eval_feedback?: string | null;
 	error?: string | null;
-	error_kind?: "empty_response";
+	error_kind?: "empty_response" | "timeout";
 	provider_stop_reason?: string;
 }
 

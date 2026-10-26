@@ -35,7 +35,7 @@ const BenchmarkRunSchema = z.object({
 	claims: z.array(z.string()).default([]),
 	eval_feedback: z.string().nullable().default(null),
 	error: z.string().nullable().default(null),
-	error_kind: z.literal("empty_response").optional(),
+	error_kind: z.enum(["empty_response", "timeout"]).optional(),
 	provider_stop_reason: z.string().optional(),
 });
 
