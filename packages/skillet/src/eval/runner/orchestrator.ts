@@ -110,7 +110,14 @@ function computeProviderSummary(runs: BenchmarkRun[]): OrchestratorResult["provi
 			stddev: stddev(modelRuns.map(fn)),
 		});
 		summary[key] = {
-			pass_rate: stat((r) => r.result.pass_rate),
+			pass_rate: {
+				mean: mean(
+					modelRuns.filter((r) => r.error_kind !== "empty_response").map((r) => r.result.pass_rate),
+				),
+				stddev: stddev(
+					modelRuns.filter((r) => r.error_kind !== "empty_response").map((r) => r.result.pass_rate),
+				),
+			},
 			time_seconds: stat((r) => r.result.time_seconds),
 			total_tokens: stat((r) => r.result.total_tokens),
 			cost_usd: stat((r) => r.result.cost_usd),
@@ -126,6 +133,9 @@ function formatSuccessLine(
 	total: number,
 ): string {
 	const r = result.result;
+	if (result.error_kind === "empty_response") {
+		return `  ${pc.red("!")} [${completed}/${total}] eval ${entry.evalCase.id} · ${entry.provider.modelId} · empty response (ungraded)`;
+	}
 	const passColor = rateColor(r.pass_rate);
 	return (
 		`  ${pc.green("✓")} [${completed}/${total}] ` +
@@ -143,6 +153,7 @@ export async function runOrchestrator(
 	systemPrompt: string,
 	opts: {
 		concurrency?: number;
+		skillDir?: string;
 		onProgress?: (msg: string) => void;
 	} = {},
 ): Promise<OrchestratorResult> {
@@ -184,7 +195,7 @@ export async function runOrchestrator(
 		let mockEnv: Awaited<ReturnType<typeof createMockEnvironment>> | undefined;
 
 		try {
-			seedSandbox(sandboxDir, fixturesDir, entry.evalCase.files);
+			const seeded = seedSandbox(sandboxDir, fixturesDir, entry.evalCase.files, opts.skillDir);
 			mockEnv = await createMockEnvironment(config.mocks, entry.evalCase.mocks);
 			const id = taskId(entry);
 			const updateDetail = (detail: string) => {
@@ -215,10 +226,40 @@ export async function runOrchestrator(
 					});
 
 					const outputFiles = [
-						...collectOutputFiles(sandboxDir),
+						...collectOutputFiles(sandboxDir, seeded),
 						...(mockEnv?.outputFiles() ?? []),
 					];
 
+					if (
+						agentRun.transcript.every((step) => !step.response.trim() && !step.toolCalls?.length)
+					) {
+						return {
+							...buildFailureResult(
+								entry,
+								"Empty provider response: no text or tool calls; assertions were not graded.",
+							),
+							error_kind: "empty_response" as const,
+							provider_stop_reason: agentRun.transcript.at(-1)?.providerStopReason,
+							expectations: [],
+							result: {
+								pass_rate: 0,
+								passed: 0,
+								failed: 0,
+								total: 0,
+								time_seconds: agentRun.totalLatencyMs / 1000,
+								input_tokens: agentRun.totalInputTokens,
+								output_tokens: agentRun.totalOutputTokens,
+								total_tokens: agentRun.totalInputTokens + agentRun.totalOutputTokens,
+								tool_calls: 0,
+								errors: 1,
+								cost_usd: estimateCost(
+									entry.provider.modelId,
+									agentRun.totalInputTokens,
+									agentRun.totalOutputTokens,
+								),
+							},
+						};
+					}
 					updateDetail("grading…");
 					const grading: GradingResult = await withHeartbeat(
 						gradeRun(graderProvider, entry.evalCase, agentRun, outputFiles),

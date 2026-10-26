@@ -33,6 +33,8 @@ export function printResults(result: OrchestratorResult, evals: EvalCase[], prov
 
 			const providerLabel = providerCount > 1 ? `${pc.dim("[")}${run.model}${pc.dim("]")} ` : "";
 
+			if (run.error) console.log(`    ${pc.red("!")} ${providerLabel}${run.error}`);
+
 			for (const exp of run.expectations) {
 				if (exp.passed) {
 					console.log(`    ${pc.green("✓")} ${providerLabel}${exp.text}`);
@@ -50,7 +52,7 @@ export function printResults(result: OrchestratorResult, evals: EvalCase[], prov
 
 			if (providerCount > 1) {
 				console.log(
-					`    ${pc.dim(`${r.passed}/${r.total} passed · ${r.time_seconds.toFixed(1)}s`)}`,
+					`    ${pc.dim(`${run.error_kind === "empty_response" ? "ungraded" : `${r.passed}/${r.total} passed`} · ${r.time_seconds.toFixed(1)}s`)}`,
 				);
 			}
 		}
@@ -62,6 +64,9 @@ export function printResults(result: OrchestratorResult, evals: EvalCase[], prov
 	const scoreColor = rateColor(overallRate);
 
 	console.log(pc.bold("  Scorecard\n"));
+	const emptyCount = result.runs.filter((run) => run.error_kind === "empty_response").length;
+	if (emptyCount)
+		console.log(`  ${emptyCount} empty response(s), ungraded and excluded from assertion scores.`);
 	console.log(
 		`  ${scoreColor(pc.bold(`${(overallRate * 100).toFixed(0)}%`))} overall  ${pc.dim(`(${totalPassed} passed, ${totalFailed} failed out of ${totalAssertions} assertions)`)}`,
 	);

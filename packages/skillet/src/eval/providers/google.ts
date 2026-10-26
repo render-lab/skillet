@@ -128,6 +128,8 @@ export class GoogleProvider extends BaseProvider {
 			inputTokens: usage?.promptTokenCount ?? 0,
 			outputTokens: usage?.candidatesTokenCount ?? 0,
 			stopReason,
+			providerStopReason:
+				response.candidates?.[0]?.finishReason ?? response.promptFeedback?.blockReason,
 			latencyMs: Date.now() - start,
 		});
 

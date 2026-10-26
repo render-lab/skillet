@@ -13,6 +13,7 @@ export interface TranscriptStep {
 	/** Set when a scripted turn was skipped because it didn't match the agent's response. */
 	turnSkipped?: string;
 	response: string;
+	providerStopReason?: string;
 	toolCalls?: ToolCall[];
 	toolResults: ToolResult[];
 	usage: { inputTokens: number; outputTokens: number };

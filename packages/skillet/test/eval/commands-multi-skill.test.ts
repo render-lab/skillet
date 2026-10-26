@@ -136,6 +136,17 @@ describe("multi-skill eval commands", () => {
 		expect(logs).toContain("1 skill(s) skipped because evals.json was not found.");
 	});
 
+	it("passes the skill root separately when eval fixtures live elsewhere", async () => {
+		const skill = await createSkill(tmpDir, "skill-a");
+		const external = path.join(tmpDir, "external");
+		await mkdir(external);
+		const evals = path.join(external, "evals.json");
+		await writeFile(evals, await readFile(path.join(skill, "evals.json")));
+		await runRun({ skills: [skill], evals, runs: "1", timeout: "5" });
+		expect(runOrchestratorMock.mock.calls[0]?.[2]).toBe(external);
+		expect(runOrchestratorMock.mock.calls[0]?.[4]).toMatchObject({ skillDir: skill });
+	});
+
 	it("runs evals for each provided skill and writes separate result folders", async () => {
 		const skillA = await createSkill(tmpDir, "skill-a", "1.2.3");
 		const skillB = await createSkill(tmpDir, "skill-b");

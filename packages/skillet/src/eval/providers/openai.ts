@@ -138,6 +138,7 @@ export class OpenAIProvider extends BaseProvider {
 			inputTokens: response.usage?.input_tokens ?? 0,
 			outputTokens: response.usage?.output_tokens ?? 0,
 			stopReason,
+			providerStopReason: response.incomplete_details?.reason ?? response.status,
 			latencyMs: Date.now() - start,
 		});
 

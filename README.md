@@ -341,3 +341,23 @@ To pin a specific release tarball: `pnpm add -D "https://github.com/render-lab/s
 ## License
 
 MIT
+
+### Eval runtime boundaries
+
+Runs copy the skill's root Markdown files and `references/` tree into the working
+directory, preserving relative paths, including with a separate `--evals` file.
+Bundled reference symlinks are rejected. Explicit `files` keep their existing
+basename placement; a collision with a bundled document fails clearly. Unchanged
+bundled documents are excluded from collected output files.
+
+Shell commands receive PATH and essential Windows runtime variables, with HOME,
+config/cache paths and temporary directories pointing into the run directory.
+Provider keys, CI tokens, proxy credentials and other parent environment variables
+are not inherited. This is environment filtering, not OS-level filesystem or
+network isolation; run untrusted evaluations in a disposable isolated runner.
+
+A response with no text or tool calls is recorded as `error_kind: empty_response`,
+with usage and the provider's stop reason when available. It is not sent to the
+grader: it has zero graded assertions and an error, not a behavioral pass or fail.
+Tool-only runs and textual refusals still receive normal grading. Existing
+benchmark files remain readable.

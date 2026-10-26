@@ -20,6 +20,7 @@ export function buildChatResponse(opts: {
 	inputTokens: number;
 	outputTokens: number;
 	stopReason: ChatResponse["stopReason"];
+	providerStopReason?: string;
 	latencyMs: number;
 }): ChatResponse {
 	return {
@@ -27,6 +28,7 @@ export function buildChatResponse(opts: {
 		toolCalls: opts.toolCalls.length ? opts.toolCalls : undefined,
 		usage: { inputTokens: opts.inputTokens, outputTokens: opts.outputTokens },
 		stopReason: opts.stopReason,
+		...(opts.providerStopReason ? { providerStopReason: opts.providerStopReason } : {}),
 		latencyMs: opts.latencyMs,
 	};
 }

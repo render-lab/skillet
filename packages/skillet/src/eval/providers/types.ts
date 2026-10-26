@@ -26,6 +26,7 @@ export interface ChatResponse {
 	toolCalls?: ToolCall[];
 	usage: { inputTokens: number; outputTokens: number };
 	stopReason: "end" | "tool_use" | "max_tokens";
+	providerStopReason?: string;
 	latencyMs: number;
 	/** Opaque provider-specific parts for faithful multi-turn replay (e.g. Gemini thought signatures). */
 	_rawParts?: unknown;

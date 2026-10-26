@@ -87,7 +87,7 @@ function renderRunRows(run: ReportRun): string {
 			return `<tr>
 				<td>${escapeHtml(benchmarkRun.eval_id)}</td>
 				<td>${escapeHtml(benchmarkRun.model)}</td>
-				<td class="${scoreClass(rate)}">${pct(rate)}</td>
+				<td class="${scoreClass(rate)}">${benchmarkRun.error_kind === "empty_response" ? "Ungraded: empty response" : pct(rate)}</td>
 				<td>${escapeHtml(`${benchmarkRun.result?.passed ?? 0}/${benchmarkRun.result?.total ?? 0}`)}</td>
 				<td>${escapeHtml((benchmarkRun.result?.time_seconds ?? 0).toFixed(1))}s</td>
 				<td>${escapeHtml(benchmarkRun.error ?? "")}</td>
@@ -165,7 +165,7 @@ function renderReport(runs: ReportRun[]): string {
 					return `<tr>
 						<td>${escapeHtml(run.benchmark.metadata.skill_name ?? run.skillId)}</td>
 						<td>${escapeHtml(run.file)}</td>
-						<td class="${scoreClass(rate)}">${pct(rate)}</td>
+						<td class="${scoreClass(rate)}">${total === 0 ? "Ungraded" : pct(rate)}</td>
 						<td>${escapeHtml(`${passed}/${total}`)}</td>
 						<td>${escapeHtml(Object.keys(run.benchmark.provider_summary ?? {}).join(", "))}</td>
 					</tr>`;

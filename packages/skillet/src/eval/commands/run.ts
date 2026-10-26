@@ -57,7 +57,7 @@ export function buildSystemPrompt(skillContent: string): string {
 ${skillContent}
 </skill_instructions>
 
-Use the available tools (bash, read_file, write_file, list_directory) to complete the task. Work step by step.`;
+Use the available tools (bash, read_file, write_file, list_directory) to complete the task. Bundled Markdown files and the references/ directory are available in your working directory at their original relative paths. Work step by step.`;
 }
 
 function resolveSkillRunMetadata(skillContent: string) {
@@ -310,6 +310,7 @@ async function runSingleSkill(
 
 	const result = await runOrchestrator(config, evals, paths.evalsDir, systemPrompt, {
 		concurrency: opts.concurrency ? Number(opts.concurrency) : undefined,
+		skillDir: paths.skillDir,
 	});
 
 	printResults(result, evals, config.providers.length);
