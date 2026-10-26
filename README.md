@@ -55,6 +55,72 @@ skillet eval run ./my-skill        # multi-provider eval run
 
 The first command writes `skillet.config.yaml` with your providers and grader. The second imports an OpenAPI spec into the config's `mocks:` block and writes a mock manifest under `.skillet-evals/mocks/`. The third runs every eval case in `./my-skill/evals.json` against every configured provider, writes `<stamp>.json` (benchmark) and `<stamp>.manifest.json` (input manifest) under `.skillet-evals/results/<skill>/`, and prints a side-by-side summary.
 
+## Run only affected skills
+
+Changed-skill selection is opt-in. Existing `skillet eval run` and explicit skill-path commands keep their behavior.
+
+```bash
+# Preview without API keys or model calls.
+skillet eval run --changed-since origin/main --dry-run
+
+# Run affected skills and save the selection explanation for CI.
+skillet eval run --changed-since origin/main \
+  --selection-output .skillet-evals/selection.json
+```
+
+Pass `--config skillet.eval.yaml` if your config uses a different name. Changed mode requires `skills.roots`; positional skill paths cannot be combined with `--changed-since`.
+
+Skillet compares HEAD to its merge base with the supplied ref, then includes staged, unstaged, and nonignored untracked files. Changes anywhere within a skill select that skill's entire suite. Existing provider/model and `--eval-id` filters still apply. Removed skills are reported without running them, and selected skills without eval files are reported as skipped. Preview validates selected eval definitions but does not authenticate, fetch remote mocks, or run models.
+
+A valid empty selection exits successfully without model calls. Git/ref/configuration errors fail before evaluation. Git history must be complete (`fetch-depth: 0` in GitHub Actions); Skillet does not fetch automatically. Worktrees, detached HEAD, and invocation from a subdirectory are supported. Inputs outside the Git repository, including escaping symlinks, require an unfiltered run.
+
+### Shared inputs and unrelated files
+
+Add optional rules to your existing config:
+
+```yaml
+skills:
+  roots: [skills]
+
+changes:
+  global:
+    - shared/manifest.json
+    - scripts/sync-shared.mjs
+    - .github/workflows/skillet-evals.yml
+  ignore:
+    - README.md
+    - docs/**
+  dependencies:
+    - paths: [shared/blueprints.md]
+      skills: [skills/render-blueprints, skills/render-deploy]
+```
+
+Patterns are relative to the Git repository root, even when the config lives in a subdirectory. `*` matches within one segment, `?` matches one non-slash character, and a whole-segment `**` matches across directories. Dotfiles are included. Absolute paths, `..`, negation, brace expansion, character classes, and environment substitution are unsupported. Consumer patterns match whole skill-directory paths; a consumer must match at least one current or base skill.
+
+The active config, root dependency manifests/lockfiles, and `.gitmodules` always select all skills. This includes `package.json`, `pnpm-workspace.yaml`, npm/pnpm/Yarn/Bun lockfiles, `pyproject.toml`, `uv.lock`, `poetry.lock`, and `requirements*.txt`. `changes.global` adds more global inputs.
+
+**Unmapped changes outside skills select all skills.** Map shared sources to their consumers to narrow coverage, or explicitly ignore unrelated docs. Ignore rules never override a direct skill change, dependency match, or global input. `.skillet-evals/**` is ignored by default outside skill directories. Shared-content manifests are not automatically interpreted; configure their inputs and consumers explicitly. External fixtures and local mock sources need dependency rules when their consumers cannot be inferred from directory ownership. Remote source changes without a Git diff are not detectable.
+
+Selection is printed with reasons (`direct`, `dependency`, `global`, or `unmapped`). `--selection-output` additionally writes a versioned JSON artifact with compared commits, changed paths, selected/removed/skipped skills, and ignored paths. It contains no credentials or file contents and does not change benchmark formats. Prefer the ignored `.skillet-evals/` directory for this artifact so it does not become an input on the next run. Both `--dry-run` and `--selection-output` require `--changed-since`.
+
+### CI adoption
+
+Upgrade Skillet before using the new flags or config block. Keep the full-suite command for manual regression runs. In a PR workflow, fetch complete history and pass the target base SHA through an environment variable:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+- name: Evaluate affected skills
+  env:
+    EVAL_BASE: ${{ github.event.pull_request.base.sha }}
+  run: >-
+    pnpm exec skillet eval run --changed-since "$EVAL_BASE"
+    --selection-output .skillet-evals/selection.json
+```
+
+Keep workflow triggers broad enough to include shared/config/dependency changes. Keep structural checks repo-wide, report empty selections as skips, and aggregate only results from the current run. Existing generated workflows are unchanged; adopting this command is a separate CI change. Preserve existing fork-PR secret restrictions; do not use `pull_request_target` to execute untrusted code with credentials.
+
 ## Evaluating a skill
 
 `skillet eval` measures how well an agent follows a skill's instructions. An eval run combines the skill's `SKILL.md`, realistic prompts (single or multi-turn), sandboxed shell and file tools, optional mocks, one or more model providers, and an LLM judge that grades the transcript against explicit assertions. The result is a benchmark history per skill — useful for comparing providers, catching regressions when you edit a skill, and publishing results in CI.

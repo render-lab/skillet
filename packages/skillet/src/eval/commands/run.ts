@@ -9,6 +9,8 @@ import {
 	resolveSkillPaths,
 	resolveSkillSelection,
 } from "../config.js";
+import { planChangedSkills, printSelection } from "../config/changed-skills.js";
+import { assertInRepository } from "../config/git-changes.js";
 import { printResults } from "../report/console-reporter.js";
 import { writeBenchmarkJson } from "../report/json-reporter.js";
 import { writeMockManifests } from "../runner/mocks.js";
@@ -37,6 +39,9 @@ export interface RunOpts {
 	timeout?: string;
 	concurrency?: string;
 	golden?: string;
+	changedSince?: string;
+	dryRun?: boolean;
+	selectionOutput?: string;
 }
 
 interface SkillRunCandidate {
@@ -110,8 +115,60 @@ function assertReferencedMocksExist(
 }
 
 export async function runRun(opts: RunOpts) {
-	const discoveryConfig = loadConfig({ configPath: opts.config });
-	const skills = resolveSkillSelection(opts.skills, discoveryConfig.skillRoots);
+	if (opts.changedSince !== undefined && !opts.changedSince.trim()) {
+		throw new Error("--changed-since requires a nonempty Git ref.");
+	}
+	if (!opts.changedSince && (opts.dryRun || opts.selectionOutput)) {
+		throw new Error("--dry-run and --selection-output require --changed-since.");
+	}
+	let skills: string[];
+	if (opts.changedSince) {
+		if (opts.skills?.length)
+			throw new Error(
+				"Skill paths cannot be combined with --changed-since. Preview selection or use explicit paths without the flag.",
+			);
+		const { repoRoot, selection } = planChangedSkills(opts.changedSince, opts.config, opts.evals);
+		if (selection.selected.length > 1 && (opts.evals || opts.golden)) {
+			throw new Error("--evals and --golden can only be used when running a single skill.");
+		}
+		printSelection(selection);
+		if (opts.selectionOutput) {
+			fs.mkdirSync(path.dirname(path.resolve(opts.selectionOutput)), { recursive: true });
+			fs.writeFileSync(opts.selectionOutput, `${JSON.stringify(selection, null, 2)}\n`);
+		}
+		const skipped = new Set(selection.unrunnable.map((skill) => skill.path));
+		skills = selection.selected
+			.filter((skill) => !skipped.has(skill.path))
+			.map((skill) => path.join(repoRoot, skill.path));
+		// Preflight all selected eval definitions before any provider is contacted.
+		for (const skill of skills) {
+			const { evalsFile, evalsDir } = resolveSkillPaths(skill, opts.evals);
+			const definition = EvalsFileSchema.parse(JSON.parse(fs.readFileSync(evalsFile, "utf-8")));
+			for (const evalCase of definition.evals) {
+				for (const file of evalCase.files)
+					assertInRepository(repoRoot, path.resolve(evalsDir, file));
+			}
+			for (const mock of definition.mocks ?? []) {
+				if (typeof mock === "string") continue;
+				for (const source of [mock.openapi, mock.mcpServer]
+					.flat()
+					.filter((value): value is string => Boolean(value))) {
+					if (!/^https?:\/\//i.test(source)) assertInRepository(repoRoot, path.resolve(source));
+				}
+			}
+		}
+		if (!skills.length) {
+			console.log("No affected runnable skills; no model evaluations started.");
+			return;
+		}
+		if (opts.dryRun) {
+			console.log("Preview only; no model evaluations started.");
+			return;
+		}
+	} else {
+		const discoveryConfig = loadConfig({ configPath: opts.config });
+		skills = resolveSkillSelection(opts.skills, discoveryConfig.skillRoots);
+	}
 	const multipleSkills = skills.length > 1;
 	let hadError = false;
 	let succeededSkills = 0;

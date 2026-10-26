@@ -34,8 +34,27 @@ export const MockConfigSchema = z.object({
 
 const ProviderEntrySchema = z.union([z.string(), ProviderConfigSchema]);
 
+// Patterns are repository-relative. Matching/consumer validation happens in changed mode.
+export const ChangesConfigSchema = z
+	.object({
+		global: z.array(z.string().min(1)).default([]),
+		ignore: z.array(z.string().min(1)).default([]),
+		dependencies: z
+			.array(
+				z
+					.object({
+						paths: z.array(z.string().min(1)).min(1),
+						skills: z.array(z.string().min(1)).min(1),
+					})
+					.strict(),
+			)
+			.default([]),
+	})
+	.strict();
+
 export const ConfigFileSchema = z.object({
 	providers: z.array(ProviderEntrySchema).min(1),
+	changes: ChangesConfigSchema.optional(),
 	grader: GraderConfigSchema.optional(),
 	skills: SkillDiscoveryConfigSchema.default({}),
 	mocks: z.record(MockConfigSchema).default({}),
