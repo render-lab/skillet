@@ -8,6 +8,8 @@ import type { ToolDefinition } from "./types.js";
  * migrating to the `zod-to-json-schema` package.
  */
 export function zodToJsonSchema(schema: ToolDefinition["parameters"]): Record<string, unknown> {
+	// Imported contracts are already JSON Schema; do not lose nested constraints.
+	if (schema && typeof schema === "object" && !("_def" in schema)) return schema;
 	return convertNode(schema);
 }
 

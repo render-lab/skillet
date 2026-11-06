@@ -344,3 +344,9 @@ with usage and the provider's stop reason when available. It is not sent to the
 grader: it has zero graded assertions and an error, not a behavioral pass or fail.
 Tool-only runs and textual refusals still receive normal grading. Existing
 benchmark files remain readable.
+
+### Inspecting tool contracts and raw evidence
+
+Mock tool JSON Schema is passed to providers without a lossy Zod round-trip, preserving nested objects, array items, required fields, enums, and descriptions. The MCP README importer recognizes indented object fields and arrays of objects; README prose remains a best-effort source. Prefer explicit inline or JSON tool descriptors for exact contracts.
+
+Set `SKILLET_SAVE_TRANSCRIPTS=1` when running evals to include raw steps, arguments, tool results, and provider stop reasons in completed run reports, including empty-response results. It is off by default. Transcripts can contain secrets: use synthetic credentials and review artifacts before sharing them. The model grader can accept an invalid call; inspect raw arguments against the contract when correctness depends on their exact shape. This option does not add deterministic schema validation to mock handlers.

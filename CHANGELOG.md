@@ -2,6 +2,12 @@
 
 All notable changes to Skillet are recorded in this file.
 
+## v0.3.2
+
+- Preserve imported tool JSON Schema through Anthropic, OpenAI, and Google requests, including nested arrays of objects, required fields, enums, and descriptions. Google now receives its supported JSON Schema field directly.
+- Preserve nested object and array parameters when importing MCP README descriptions instead of dropping their parents or promoting children to top-level fields.
+- Add opt-in raw evaluation transcripts with `SKILLET_SAVE_TRANSCRIPTS=1`, including a validated report schema. Raw arguments/results may contain secrets and are omitted by default.
+
 ## v0.2.0
 
 Skillet now focuses solely on multi-provider skill evals and integration mocks.

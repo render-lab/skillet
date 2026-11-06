@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ExpectationResultSchema } from "./grading.js";
+import { TranscriptStepSchema } from "./transcript.js";
 
 const ProviderInfoSchema = z.object({
 	name: z.string(),
@@ -31,6 +32,7 @@ const BenchmarkRunSchema = z.object({
 	model: z.string(),
 	run_number: z.number().int(),
 	result: RunResultSchema,
+	transcript: z.array(TranscriptStepSchema).optional(),
 	expectations: z.array(ExpectationResultSchema),
 	claims: z.array(z.string()).default([]),
 	eval_feedback: z.string().nullable().default(null),

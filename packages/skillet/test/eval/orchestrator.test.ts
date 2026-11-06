@@ -54,9 +54,13 @@ describe("eval outcome classification", () => {
 		skill = fs.mkdtempSync(path.join(os.tmpdir(), "skillet-outcome-"));
 		fs.writeFileSync(path.join(skill, "SKILL.md"), "skill");
 	});
-	afterEach(() => fs.rmSync(skill, { recursive: true, force: true }));
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		fs.rmSync(skill, { recursive: true, force: true });
+	});
 
 	it("records an empty response as ungraded with usage and provider stop reason, without calling the grader", async () => {
+		vi.stubEnv("SKILLET_SAVE_TRANSCRIPTS", "1");
 		chat.mockResolvedValue(response("  ", { providerStopReason: "refusal" }));
 		const result = await runOrchestrator(config, [evalCase], skill, "skill", { concurrency: 1 });
 		expect(grade).not.toHaveBeenCalled();
@@ -82,7 +86,30 @@ describe("eval outcome classification", () => {
 			provider_summary: result.providerSummary,
 		});
 		expect(parsed.runs[0]?.error_kind).toBe("empty_response");
+		expect(parsed.runs[0]?.transcript?.[0]?.providerStopReason).toBe("refusal");
 	});
+
+	it.each([undefined, "0", "1"])(
+		"retains raw call evidence only when explicitly enabled (%s)",
+		async (setting) => {
+			vi.stubEnv("SKILLET_SAVE_TRANSCRIPTS", setting);
+			const call = {
+				id: "1",
+				name: "write_file",
+				arguments: { path: "answer.txt", content: "synthetic-value" },
+			};
+			chat
+				.mockResolvedValueOnce(response("", { stopReason: "tool_use", toolCalls: [call] }))
+				.mockResolvedValueOnce(response("done"));
+			const result = await runOrchestrator(config, [evalCase], skill, "skill", { concurrency: 1 });
+			if (setting === "1") {
+				expect(result.runs[0]?.transcript?.[0]?.toolCalls).toEqual([call]);
+				expect(result.runs[0]?.transcript?.[0]?.toolResults).toHaveLength(1);
+			} else {
+				expect(result.runs[0]).not.toHaveProperty("transcript");
+			}
+		},
+	);
 
 	it("grades a textual refusal normally and excludes empty responses from behavioral averages", async () => {
 		chat.mockResolvedValueOnce(response("")).mockResolvedValueOnce(response("I cannot do that."));

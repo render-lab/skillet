@@ -1,29 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { BaseProvider, buildChatResponse, normalizeChatParams } from "./base.js";
 import { zodToJsonSchema } from "./schema.js";
 import type { ChatParams, ChatResponse, ToolCall, ToolDefinition } from "./types.js";
-
-const JSON_TO_GOOGLE_TYPE: Record<string, string> = {
-	object: Type.OBJECT,
-	string: Type.STRING,
-	number: Type.NUMBER,
-	boolean: Type.BOOLEAN,
-};
-
-function toGoogleSchema(jsonSchema: Record<string, unknown>): Record<string, unknown> {
-	const result = { ...jsonSchema };
-	if (typeof result.type === "string" && JSON_TO_GOOGLE_TYPE[result.type]) {
-		result.type = JSON_TO_GOOGLE_TYPE[result.type];
-	}
-	if (result.properties && typeof result.properties === "object") {
-		const mapped: Record<string, unknown> = {};
-		for (const [k, v] of Object.entries(result.properties as Record<string, unknown>)) {
-			mapped[k] = toGoogleSchema(v as Record<string, unknown>);
-		}
-		result.properties = mapped;
-	}
-	return result;
-}
 
 function formatTools(tools: ToolDefinition[]) {
 	return [
@@ -31,7 +9,7 @@ function formatTools(tools: ToolDefinition[]) {
 			functionDeclarations: tools.map((t) => ({
 				name: t.name,
 				description: t.description,
-				parameters: toGoogleSchema(zodToJsonSchema(t.parameters)),
+				parametersJsonSchema: zodToJsonSchema(t.parameters),
 			})),
 		},
 	];

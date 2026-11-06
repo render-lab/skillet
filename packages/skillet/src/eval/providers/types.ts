@@ -3,7 +3,7 @@ import type { z } from "zod";
 export interface ToolDefinition {
 	name: string;
 	description: string;
-	parameters: z.ZodType;
+	parameters: z.ZodType | Record<string, unknown>;
 }
 
 export interface ToolCall {

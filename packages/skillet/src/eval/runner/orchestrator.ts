@@ -238,6 +238,9 @@ export async function runOrchestrator(
 								entry,
 								"Empty provider response: no text or tool calls; assertions were not graded.",
 							),
+							...(process.env.SKILLET_SAVE_TRANSCRIPTS === "1"
+								? { transcript: agentRun.transcript }
+								: {}),
 							error_kind: "empty_response" as const,
 							provider_stop_reason: agentRun.transcript.at(-1)?.providerStopReason,
 							expectations: [],
@@ -294,6 +297,9 @@ export async function runOrchestrator(
 							errors: agentRun.errors,
 							cost_usd: cost,
 						},
+						...(process.env.SKILLET_SAVE_TRANSCRIPTS === "1"
+							? { transcript: agentRun.transcript }
+							: {}),
 						expectations: grading.expectations,
 						claims: grading.claims,
 						eval_feedback: grading.eval_feedback,
