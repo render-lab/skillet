@@ -75,10 +75,6 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 	let providers: ProviderConfig[] =
 		fileConfig?.providers.map(normalizeProviderEntry) ?? detectProviders();
 
-	if (overrides.providers?.length) {
-		providers = providers.filter((p) => overrides.providers?.includes(p.name));
-	}
-
 	if (overrides.models?.length) {
 		type ProviderName = "anthropic" | "openai" | "google";
 		providers = overrides.models.map((spec) => {
@@ -96,6 +92,13 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 
 			return { name, model, apiKey: resolveApiKey(name) };
 		});
+	}
+
+	// A model list can replace the configured providers, so apply the requested
+	// provider scope last. Otherwise evals.json models silently broaden the run.
+	if (overrides.providers?.length) {
+		const selected = new Set(overrides.providers.map((name) => name.trim()));
+		providers = providers.filter((p) => selected.has(p.name));
 	}
 
 	const skipped: string[] = [];

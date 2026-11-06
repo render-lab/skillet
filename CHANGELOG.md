@@ -2,6 +2,10 @@
 
 All notable changes to Skillet are recorded in this file.
 
+## v0.3.3
+
+- Apply provider selection after model overrides, so an eval file's `models` list cannot silently expand `--providers anthropic` into other paid providers. A requested provider/model combination with no matches fails before execution.
+
 ## v0.3.2
 
 - Preserve imported tool JSON Schema through Anthropic, OpenAI, and Google requests, including nested arrays of objects, required fields, enums, and descriptions. Google now receives its supported JSON Schema field directly.
