@@ -37,15 +37,13 @@ function normalizeProviderEntry(entry: string | ProviderConfig): ProviderConfig 
 }
 
 /**
- * Load config from YAML file (if present), merge with env var auto-detection,
- * and apply CLI overrides. Returns a fully resolved config with API keys.
+ * Read and validate YAML plus discovery paths without resolving provider credentials.
  */
-export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
-	const configPath = overrides.configPath ?? "skillet.config.yaml";
+export function loadStructuralConfig(configPath = "skillet.config.yaml", explicit = false) {
 	const resolvedConfigPath = path.resolve(configPath);
 	let fileConfig: Config | undefined;
 
-	if (overrides.configPath && !fs.existsSync(configPath)) {
+	if (explicit && !fs.existsSync(configPath)) {
 		throw new Error(
 			`Config file not found at ${configPath}.\nCheck the --config path, or run "skillet eval init" to scaffold one.`,
 		);
@@ -58,6 +56,21 @@ export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
 	}
 
 	const configDir = fileConfig ? path.dirname(resolvedConfigPath) : process.cwd();
+
+	return {
+		fileConfig,
+		configDir,
+		configPath: resolvedConfigPath,
+		skillRoots: (fileConfig?.skills.roots ?? []).map((root) => path.resolve(configDir, root)),
+	};
+}
+
+/** Compatibility facade: resolve providers, credentials, mocks, and CLI overrides. */
+export function loadConfig(overrides: CliOverrides = {}): ResolvedConfig {
+	const { fileConfig, configDir } = loadStructuralConfig(
+		overrides.configPath,
+		Boolean(overrides.configPath),
+	);
 
 	let providers: ProviderConfig[] =
 		fileConfig?.providers.map(normalizeProviderEntry) ?? detectProviders();

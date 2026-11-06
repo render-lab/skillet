@@ -76,6 +76,26 @@ describe("runReport", () => {
 		await rm(tmpDir, { recursive: true, force: true });
 	});
 
+	it("labels empty responses as ungraded rather than a zero-percent behavioral failure", async () => {
+		const benchmark = makeBenchmark("skill-a");
+		const first = benchmark.runs[0];
+		if (!first) throw new Error("missing test run");
+		Object.assign(first, {
+			error_kind: "empty_response",
+			error: "Empty provider response",
+			expectations: [],
+		});
+		Object.assign(first.result, { pass_rate: 0, passed: 0, failed: 0, total: 0, errors: 1 });
+		await writeFile(
+			path.join(tmpDir, ".skillet-evals/results/skill-a/2026-04-27T12-00-00.json"),
+			JSON.stringify(benchmark),
+		);
+		runReport({ skill: tmpDir });
+		const report = await readFile(path.join(tmpDir, ".skillet-evals/report/index.html"), "utf8");
+		expect(report).toContain("Ungraded: empty response");
+		expect(report).toContain("Empty provider response");
+	});
+
 	it("writes a standalone static HTML report", async () => {
 		runReport({ skill: tmpDir });
 

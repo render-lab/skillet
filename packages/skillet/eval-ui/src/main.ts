@@ -376,7 +376,7 @@ function evalRunCard(run: BenchmarkFile["runs"][number]) {
 				${run.error ? '<span class="text-xs uppercase tracking-[0.16em] text-red-400">Error</span>' : ""}
 			</div>
 			<div class="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-zinc-400">
-				<span class="${passTextClass(run.result.pass_rate)}">${pct(run.result.pass_rate)} pass rate</span>
+				<span class="${passTextClass(run.result.pass_rate)}">${run.error_kind === "empty_response" ? "Ungraded: empty response" : `${pct(run.result.pass_rate)} pass rate`}</span>
 				<span>${fmt(run.result.time_seconds, 1)}s</span>
 				<span>${run.result.total_tokens ?? 0} tokens</span>
 				<span>$${fmt(run.result.cost_usd, 4)}</span>

@@ -2,7 +2,6 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import YAML from "yaml";
-import { z } from "zod";
 import type { MockConfig, MockToolConfig } from "../config/schema.js";
 import type { ToolDefinition, ToolHandler } from "../providers/types.js";
 import type { EvalMockScenario } from "../schemas/evals.js";
@@ -242,7 +241,13 @@ function toolFromDescriptor(mockName: string, descriptor: JsonObject): ToolMockD
 }
 
 function jsonSchemaType(type: string): string {
-	if (type === "number" || type === "integer" || type === "boolean" || type === "array")
+	if (
+		type === "object" ||
+		type === "number" ||
+		type === "integer" ||
+		type === "boolean" ||
+		type === "array"
+	)
 		return type;
 	return "string";
 }
@@ -250,6 +255,12 @@ function jsonSchemaType(type: string): string {
 function importMcpToolsFromReadme(mockName: string, content: string): ToolMockDefinition[] {
 	const tools: ToolMockDefinition[] = [];
 	const lines = content.split(/\r?\n/);
+	const parents: Array<{
+		indent: number;
+		properties: JsonObject;
+		required: string[];
+		childrenRequired: boolean;
+	}> = [];
 	let current:
 		| {
 				name: string;
@@ -272,6 +283,7 @@ function importMcpToolsFromReadme(mockName: string, content: string): ToolMockDe
 			},
 		});
 		current = undefined;
+		parents.length = 0;
 	};
 
 	for (const line of lines) {
@@ -284,21 +296,55 @@ function importMcpToolsFromReadme(mockName: string, content: string): ToolMockDe
 				properties: {},
 				required: [],
 			};
+			parents.push({
+				indent: -1,
+				properties: current.properties,
+				required: current.required,
+				childrenRequired: false,
+			});
 			continue;
 		}
 
 		if (!current) continue;
 		const paramMatch = line.match(
-			/^\s*-\s+`([^`]+)`:\s+(.+?)\s+\(([^,)]+)(?:,\s*(required|optional))?\)/i,
+			/^(\s*)-\s+`([^`]+)`:\s+(.+?)\s+\((string|number|integer|boolean|object|array(?: of (?:objects?|strings?|numbers?|integers?|booleans?))?)(?:,\s*([^)]*))?\)(.*)$/i,
 		);
 		if (!paramMatch) continue;
-		const [, paramName, description, type, requiredness] = paramMatch;
+		const [, whitespace, paramName, description, type, requiredness, suffix = ""] = paramMatch;
 		if (!paramName || !description || !type) continue;
-		current.properties[paramName] = {
-			type: jsonSchemaType(type.toLowerCase()),
-			description,
+		const indent = (whitespace ?? "").replaceAll("\t", "    ").length;
+		while (parents.length > 1 && indent <= (parents.at(-1)?.indent ?? -1)) parents.pop();
+		const parent = parents.at(-1);
+		if (!parent) continue;
+		const lowerType = type.toLowerCase();
+		const arrayItemType = lowerType.match(/^array of (.+?)s?$/)?.[1];
+		const property: JsonObject = {
+			type: lowerType.startsWith("array") ? "array" : jsonSchemaType(lowerType),
+			description: `${description}${suffix}`.trim(),
 		};
-		if (requiredness?.toLowerCase() === "required") current.required.push(paramName);
+		if (property.type === "array")
+			property.items = arrayItemType ? { type: jsonSchemaType(arrayItemType) } : {};
+		const enumText = suffix.match(/Accepted values:\s*(.+?)(?:\. |\.$|$)/i)?.[1];
+		if (enumText && property.type === "string")
+			property.enum = [...enumText.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+		parent.properties[paramName] = property;
+		const explicitlyOptional = /^optional\b/i.test(requiredness ?? "");
+		if (/^required\b/i.test(requiredness ?? "") || (parent.childrenRequired && !explicitlyOptional))
+			parent.required.push(paramName);
+		const object =
+			property.type === "object" ? property : (property.items as JsonObject | undefined);
+		if (object?.type === "object") {
+			const properties: JsonObject = {};
+			const required: string[] = [];
+			object.properties = properties;
+			object.required = required;
+			parents.push({
+				indent,
+				properties,
+				required,
+				childrenRequired: /requires these fields/i.test(suffix),
+			});
+		}
 	}
 
 	flush();
@@ -352,29 +398,6 @@ async function importMcpToolDescriptors(
 		}
 	}
 	return tools;
-}
-
-function zodFromJsonSchema(schema: JsonObject | undefined): z.ZodType {
-	if (!schema || schema.type !== "object" || !schema.properties) return z.record(z.unknown());
-	const required = new Set(Array.isArray(schema.required) ? schema.required : []);
-	const shape: Record<string, z.ZodType> = {};
-	for (const [name, property] of Object.entries(schema.properties as JsonObject)) {
-		const type =
-			property && typeof property === "object" ? (property as JsonObject).type : undefined;
-		let field: z.ZodType =
-			type === "boolean"
-				? z.boolean()
-				: type === "number" || type === "integer"
-					? z.number()
-					: type === "array"
-						? z.array(z.unknown())
-						: type === "object"
-							? z.record(z.unknown())
-							: z.string();
-		if (!required.has(name)) field = field.optional();
-		shape[name] = field;
-	}
-	return z.object(shape).passthrough();
 }
 
 function getByStateExpression(
@@ -690,7 +713,7 @@ export async function createMockEnvironment(
 			tools.push({
 				name: tool.name,
 				description: `[${mock.name}] ${tool.description}`,
-				parameters: zodFromJsonSchema(tool.parameters),
+				parameters: tool.parameters ?? { type: "object", properties: {} },
 			});
 			handlers[tool.name] = async (args) => {
 				try {

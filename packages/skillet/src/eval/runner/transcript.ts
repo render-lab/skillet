@@ -1,23 +1,5 @@
-import type { ToolCall } from "../providers/types.js";
-
-export interface ToolResult {
-	id: string;
-	name: string;
-	result: unknown;
-}
-
-export interface TranscriptStep {
-	step: number;
-	turn?: number;
-	userMessage?: string;
-	/** Set when a scripted turn was skipped because it didn't match the agent's response. */
-	turnSkipped?: string;
-	response: string;
-	toolCalls?: ToolCall[];
-	toolResults: ToolResult[];
-	usage: { inputTokens: number; outputTokens: number };
-	latencyMs: number;
-}
+import type { TranscriptStep } from "../schemas/transcript.js";
+export type { TranscriptStep, ToolResult } from "../schemas/transcript.js";
 
 export interface AgentRun {
 	transcript: TranscriptStep[];

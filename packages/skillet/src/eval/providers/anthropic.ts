@@ -91,6 +91,7 @@ export class AnthropicProvider extends BaseProvider {
 			inputTokens: response.usage.input_tokens,
 			outputTokens: response.usage.output_tokens,
 			stopReason: STOP_MAP[response.stop_reason ?? "end_turn"] ?? "end",
+			providerStopReason: response.stop_reason ?? undefined,
 			latencyMs: Date.now() - start,
 		});
 	}

@@ -113,6 +113,7 @@ export async function runAgentLoop(params: AgentLoopParams): Promise<AgentRun> {
 			step,
 			turn: currentTurn,
 			response: response.content,
+			providerStopReason: response.providerStopReason,
 			toolCalls: response.toolCalls,
 			toolResults: [],
 			usage: response.usage,

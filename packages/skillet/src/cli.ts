@@ -146,6 +146,9 @@ evalProgram
 	.option("--timeout <seconds>", "Timeout per eval in seconds", "300")
 	.option("--concurrency <n>", "Max concurrent eval runs (default: all, max 10)")
 	.option("--golden <path>", "Golden benchmark file to compare against for regression")
+	.option("--changed-since <ref>", "Run skills affected since the merge base with this Git ref")
+	.option("--dry-run", "Preview changed-skill selection without API keys or model calls")
+	.option("--selection-output <path>", "Write changed-skill selection metadata as JSON")
 	.action((skills, opts) =>
 		runCliCommand(async () => {
 			loadEnvForSkills(skills);

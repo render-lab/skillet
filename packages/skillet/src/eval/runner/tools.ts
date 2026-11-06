@@ -64,6 +64,25 @@ function rejectInteractiveCommand(command: string): string | null {
 	return null;
 }
 
+// The evaluator needs provider credentials; commands run by the evaluated agent do not.
+function shellEnvironment(sandboxDir: string): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = {
+		HOME: sandboxDir,
+		USERPROFILE: sandboxDir,
+		XDG_CONFIG_HOME: path.join(sandboxDir, ".config"),
+		XDG_CACHE_HOME: path.join(sandboxDir, ".cache"),
+		TMPDIR: sandboxDir,
+		TMP: sandboxDir,
+		TEMP: sandboxDir,
+		LANG: "C.UTF-8",
+		TERM: "dumb",
+	};
+	for (const key of ["PATH", "SystemRoot", "WINDIR", "ComSpec", "PATHEXT"]) {
+		if (process.env[key] !== undefined) env[key] = process.env[key];
+	}
+	return env;
+}
+
 function runBashCommand(
 	command: string,
 	sandboxDir: string,
@@ -77,7 +96,7 @@ function runBashCommand(
 				timeout: timeoutMs,
 				maxBuffer: 1024 * 1024,
 				encoding: "utf-8",
-				env: { ...process.env, HOME: sandboxDir },
+				env: shellEnvironment(sandboxDir),
 			},
 			(error: ExecException | null, stdout: string, stderr: string) => {
 				if (error) {

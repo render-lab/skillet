@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -22,20 +23,62 @@ const SKIP_DIRS = new Set([
 const MAX_COLLECTED_FILE = 50 * 1024;
 const MAX_TOTAL_COLLECTED = 200 * 1024;
 
-/** Copy eval-referenced files into the sandbox. */
-export function seedSandbox(sandboxDir: string, skillDir: string, files: string[]) {
+type SeededFiles = Map<string, string>;
+
+function fileHash(file: string): string {
+	return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+/** Copy bundled docs with their paths intact; retain legacy fixture basename placement. */
+export function seedSandbox(
+	sandboxDir: string,
+	fixturesDir: string,
+	files: string[],
+	skillDir = fixturesDir,
+): SeededFiles {
+	const seeded: SeededFiles = new Map();
+	function copyReference(source: string, relative: string) {
+		const stat = fs.lstatSync(source);
+		if (stat.isSymbolicLink()) {
+			throw new Error(`Bundled reference must not be a symlink: ${relative}`);
+		}
+		const dest = path.join(sandboxDir, relative);
+		if (stat.isDirectory()) {
+			for (const child of fs.readdirSync(source)) {
+				copyReference(path.join(source, child), path.join(relative, child));
+			}
+		} else if (stat.isFile()) {
+			fs.mkdirSync(path.dirname(dest), { recursive: true });
+			fs.copyFileSync(source, dest);
+			seeded.set(relative, fileHash(dest));
+		}
+	}
+	for (const entry of fs.readdirSync(skillDir)) {
+		if (entry.endsWith(".md") || entry === "references") {
+			copyReference(path.join(skillDir, entry), entry);
+		}
+	}
 	for (const file of files) {
-		const src = path.resolve(skillDir, file);
-		const dest = path.join(sandboxDir, path.basename(file));
+		const src = path.resolve(fixturesDir, file);
+		const relative = path.basename(file);
+		const dest = path.join(sandboxDir, relative);
+		if (seeded.has(relative)) {
+			if (fs.existsSync(src) && fileHash(src) === seeded.get(relative)) continue;
+			throw new Error(`Fixture conflicts with bundled reference: ${file}`);
+		}
 		if (fs.existsSync(src)) {
 			fs.mkdirSync(path.dirname(dest), { recursive: true });
 			fs.copyFileSync(src, dest);
 		}
 	}
+	return seeded;
 }
 
 /** Collect files created in the sandbox (for grading context), skipping dependency dirs. */
-export function collectOutputFiles(sandboxDir: string): Array<{ path: string; content: string }> {
+export function collectOutputFiles(
+	sandboxDir: string,
+	seeded: SeededFiles = new Map(),
+): Array<{ path: string; content: string }> {
 	const results: Array<{ path: string; content: string }> = [];
 	let totalSize = 0;
 
@@ -55,6 +98,8 @@ export function collectOutputFiles(sandboxDir: string): Array<{ path: string; co
 				walk(full);
 			} else {
 				try {
+					const relative = path.relative(sandboxDir, full);
+					if (seeded.has(relative) && seeded.get(relative) === fileHash(full)) continue;
 					const stat = fs.statSync(full);
 					if (stat.size > MAX_COLLECTED_FILE) {
 						results.push({
