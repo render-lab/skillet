@@ -174,6 +174,20 @@ describe("loadConfig", () => {
 		});
 	});
 
+	it("keeps provider filtering after a per-skill model list overrides configured models", () => {
+		process.env.ANTHROPIC_API_KEY = "synthetic-anthropic";
+		process.env.OPENAI_API_KEY = "synthetic-openai";
+		process.env.GOOGLE_API_KEY = "synthetic-google";
+		const models = ["claude-opus-5-5", "gpt-6-astra", "gemini-3.1-pro-preview"];
+		const config = loadConfig({ providers: [" anthropic "], models });
+		expect(config.providers.map(({ name, model }) => ({ name, model }))).toEqual([
+			{ name: "anthropic", model: "claude-opus-5-5" },
+		]);
+		expect(() => loadConfig({ providers: ["anthropic"], models: ["gpt-6-astra"] })).toThrow(
+			/No providers configured/,
+		);
+	});
+
 	it("throws when configured providers are missing API keys", async () => {
 		const configPath = path.join(tmpDir, "missing-key.eval.yaml");
 
